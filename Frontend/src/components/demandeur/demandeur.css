@@ -47,6 +47,7 @@ main{
     border-radius: 10px;
     background: #c00707;
     margin: 2rem;
+    margin-top: 8rem;
 }
 
 .button:hover{

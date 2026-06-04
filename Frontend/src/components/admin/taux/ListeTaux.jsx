@@ -151,12 +151,17 @@ function ListeTaux(){
         >
             <UserForm onSuccess={handleSuccess}/>
         </DialogPage>
-        <Link to={"/home@admin"}>
-            Retour
-        </Link>
-         <Link to={"/taux/Historique"}>
-            Historique
-        </Link>
+        <div style={{
+            paddingTop :"5rem"
+        }}>
+
+            <Link to={"/home@admin"}>
+                Retour
+            </Link>
+            <Link to={"/taux/Historique"}>
+                Historique
+            </Link>
+        </div>
         <Button 
             onClick={() => setIsOpen(true)}
         >
@@ -186,6 +191,7 @@ function ListeTaux(){
                 editData={editData}
                 onEditChange={handleEditChange}
                 fieldsTypes = {fieldsTypes}
+                
             />
         )
 

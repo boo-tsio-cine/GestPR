@@ -152,7 +152,7 @@ function ListeUser(){
   
   
   return<>
-    <Nav/>
+    <Nav />
     <DialogPage
         isOpen={isOpen}
         onClose={()=>setIsOpen(false)}
@@ -162,9 +162,17 @@ function ListeUser(){
         >
         <UserForm onSuccess={handleSuccess}/>
     </DialogPage>
-    <Link to={"/home@admin"}>Retour</Link>
+    <div
+      style={{
+        paddingTop:"5rem"
+      }}
+    >
+      <Link to={"/home@admin"}>Retour</Link>
         
-    <Button  onClick={()=>setIsOpen(true)}>Insérer</Button>
+      <Button  onClick={()=>setIsOpen(true)}>Insérer</Button>
+
+    </div>
+   
           
         
     {notification && (

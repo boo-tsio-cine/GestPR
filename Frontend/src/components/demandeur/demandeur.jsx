@@ -239,13 +239,15 @@ function Demandeur(){
   }, [demandes, filtrerDate, filtrerStatus, filtrerLots] );
 
   return (
-    <main className={`min-h-screen bg-background transition `}>
+    <main>
       <Nav/>
       <div className={`page ${open  ? "blur" : ""} ${detail  ? "blur" : ""}`}>
         <div className="background">
         
         </div>
-        
+        {/* <Button size="lg" className="gap-2 button">
+                  <FileText className="h-4 w-4 " /> Nouvelle demande
+                </Button> */}
         <Toaster />
         {detail && (
         loadingDetail ? (
@@ -497,7 +499,7 @@ function Demandeur(){
                    <TableRow>
                      <TableHead>Code Lot</TableHead>
                      <TableHead>Désignation</TableHead>
-                     <TableHead>Quantité</TableHead>
+                     {/* <TableHead>Quantité</TableHead> */}
                    </TableRow>
                  </TableHeader>
                  <TableBody>
@@ -509,9 +511,9 @@ function Demandeur(){
                         <TableCell>
                           {a.designation || "—"}
                         </TableCell>
-                        <TableCell className="text-right">
+                        {/* <TableCell className="text-right">
                           {a.quantite ?? "—"}
-                        </TableCell>
+                        </TableCell> */}
                       </TableRow>
                     ))}
                  </TableBody>
