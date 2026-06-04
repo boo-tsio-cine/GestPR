@@ -1,0 +1,14 @@
+    .table_crud{
+        /* background: #000; */
+        width: 100%;
+        margin: 2rem;
+    }
+    
+    
+    .table-background{
+        background-color: brown;
+    }
+
+    .table_setting{
+        width: 10%;
+    }

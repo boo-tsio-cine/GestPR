@@ -1,0 +1,55 @@
+.test{
+    /* background: red; */
+    position : absolute;
+    top:0;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    padding: 5rem;
+}
+
+input{
+    width: 25rem;
+}
+
+.input-control{
+    width: 20rem;
+}
+
+.form-user{
+    /* background: yellow; */
+}
+
+
+
+
+/* .MAIL{
+    width: 20rem;
+} */
+
+.MAIL{
+    width: 20%;
+}
+.NOM{
+    width: 15%;
+}
+.PRENOM{
+    width: 15%;
+}
+.MATRICULE{
+    width: 10%;
+}
+.FIXE{
+    width: 10%;
+}
+.ROLE{
+    width: 12%;
+}
+.SITE{
+    width: 13%;
+}
+.table_setting{
+    width: 5%;
+}

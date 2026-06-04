@@ -1,0 +1,34 @@
+.logo {
+    width: 6rem;
+    height: 100%;
+    overflow: hidden;
+    border-radius: 50%;
+}
+
+.logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    display: block;
+}
+
+.navbar{
+    width: 100%;
+    height: 5rem;
+    overflow: hidden;
+}
+
+.deconnexion {
+    background: rgb(131, 131, 131);
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.deconnexion:hover {
+    background: #ee7d88;
+    color: white;
+}
