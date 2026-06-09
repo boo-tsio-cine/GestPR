@@ -1,95 +1,66 @@
-﻿using GestPR.Data;
-using GestPR.Models;
-using Microsoft.AspNetCore.Http;
+﻿using GestPR.Dtos;
+using GestPR.Service;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace GestPR.Controllers
 {
-
-    [Route("/api/origine")]
     [ApiController]
+    [Route("api/origines")]
     public class OrigineController : ControllerBase
     {
-        private readonly AppDbContext _context;
+        private readonly IOrigineService _service;
 
-        public OrigineController(AppDbContext context) { _context = context; }
-
-        //public AppDbContext Get_context()
-        //{
-        //    return _context;
-        //}
-
-
-        // GET: OrigineController
-         [HttpGet]
-    public async Task<ActionResult<IEnumerable<Origine>>> GetAll()
-    {
-        return await _context.Origine.ToListAsync();
-    }
-
-
-        [HttpPost]
-        public async Task<ActionResult<Origine>> Create([FromBody] Origine origine)
+        public OrigineController(IOrigineService service)
         {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
-            _context.Origine.Add(origine);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetAll),
-                new
-                {
-                    id = origine.Id,
-                }, origine);
+            _service = service;
         }
 
-
-        //PUT : api/taux/5
-        //[HttpPut("{id}")]
-        //public async Task<IActionResult> Update(int id, [FromBody] Origine origine))
-        //Put : api/origine/5
-        [HttpPut("{id}")]
-        public async Task<ActionResult> Update(int id, [FromBody] Origine origine)
+        // GET api/origines
+        [HttpGet]
+        public async Task<IActionResult> GetAll()
         {
-            if (id != origine.Id)
-                return BadRequest("L'id ne correspond pas");
+            var origines = await _service.GetAllAsync();
+            return Ok(origines);
+        }
 
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
-            _context.Entry(origine).State = EntityState.Modified;
-
+        // GET api/origines/3
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetById(int id)
+        {
             try
             {
-                await _context.SaveChangesAsync();
+                var origine = await _service.GetByIdAsync(id);
+                return Ok(origine);
             }
-            catch (DbUpdateConcurrencyException)
+            catch (KeyNotFoundException)
             {
-                if (!_context.Origine.Any(t => t.Id == id))
-                    return NotFound();
-                throw;
+                // ✅ return manquait — causait CS0161
+                return NotFound(new { message = $"Origine {id} introuvable" });
             }
-
-            return NoContent();
         }
 
+        // POST api/origines
+        [HttpPost]
+        public async Task<IActionResult> Create([FromBody] OrigineCreateDto dto)
+        {
+            try
+            {
+                // ✅ utilise le Service + DTO — plus _context directement
+                var created = await _service.CreateAsync(dto);
+                return Ok(created);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        // DELETE api/origines/3
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var origine = await _context.Origine.FindAsync(id);
-
-            if (origine == null)
-                return NotFound();
-
-            _context.Origine.Remove(origine);
-            await _context.SaveChangesAsync();
-
+            await _service.DeleteAsync(id);
             return NoContent();
         }
-
-
-
     }
 }

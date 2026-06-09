@@ -1,4 +1,5 @@
 ﻿using GestPR.Data;
+using GestPR.Dtos;
 using GestPR.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -49,18 +50,24 @@ namespace GestPR.Controllers
         // POST: api/demandes — créer l'entête
 
         [HttpPost]
-        public async Task<ActionResult<Demande>> Create([FromBody] Demande demande)
+        public async Task<ActionResult<Demande>> Create([FromBody] DemandeCreateDto dto)
         {
-            // Générer le numéro de dossier automatiquement
-            demande.NumDossier = $"DEM-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..6].ToUpper()}";
-            demande.Status = "Nouvelle";
-            demande.DateTime = DateTime.UtcNow;
+            var demande = new Demande()
+            {
+                IdDemandeur = dto.IdDemandeur,
+                Motif = dto.Motif ?? "En attente",
+                NumDossier = $"DEM-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..6].ToUpper()}",
+                Status = "Nouvelle",
+                DateTime = DateTime.UtcNow
+
+            };
 
             _context.Demande.Add(demande);
             await _context.SaveChangesAsync();
 
-            // ✅ Retourne la demande créée avec son Id
-            return CreatedAtAction(nameof(GetAll), new { id = demande.Id}, demande);
+            return Ok(new { id = demande.Id, numDossier = demande.NumDossier });
+            
+                           
         }
 
     }

@@ -1,5 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import logo from './logo.png';
+
 import "./nav.css";
 
 
@@ -26,7 +28,9 @@ function Nav(){
             color:"red", backgroundColor:"#c00707",position:"fixed"
         }}>
             <div className="logo">
-                <img src="./image/OIP(1).jfif" />
+                <img src={logo} alt="logo" onError={(e) => {    // ← fallback si image manquante
+                        e.target.style.display = "none";
+                    }} />
             </div>
 
             <div className="d-flex align-items-center gap-3">

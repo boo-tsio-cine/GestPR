@@ -133,52 +133,57 @@ function ListeFournisseur(){
     
         return <>
             <Nav/>
-            <DialogPage
-                isOpen={isOpen}
-                onClose = {()=> setIsOpen(false)}
-                title = "Insertion fournisseur"
-                description="Veuiller inserer nouveau fournisseur"
-                className="test"
-            >
-                <UserForm onSuccess={handleSuccess}/>
-            </DialogPage>
-    
-            <Link to={"/home@admin"}>
-                Retour
-            </Link>
-            <Button 
-                onClick={() => setIsOpen(true)}
-            >
-                Insérer
-            </Button>
-    
-            {notification && (
-                <div className="mb-4 p-4 bg-green-500 text-red rounded-lg shadow-lg text-center">
-                    {notification}
-                </div>
-            )}
-    
-            {loading && <p>Chargement ...</p>}
-            {error && <p className="text-red-500">
-                {error}    
-            </p>}
-            {!loading && !error &&(
-                <CrudPage 
-                keyMapping={keyMapping} 
-                headers={tete} 
-                data={frs} 
-                onDelete= {handleDelete}
-                onEdit={handleEdit}
-                onSave={handleSave}
-                onCancel={handleCancel}
-                editingId={editingId}
-                editData={editData}
-                onEditChange={handleEditChange}
-                fieldsTypes = {fieldsTypes}
-            />
-            )
-    
-            }
+            <div style = {{
+                paddingTop : "5rem",
+            }}>
+                
+                <DialogPage
+                    isOpen={isOpen}
+                    onClose = {()=> setIsOpen(false)}
+                    title = "Insertion fournisseur"
+                    description="Veuiller inserer nouveau fournisseur"
+                    className="test"
+                >
+                    <UserForm onSuccess={handleSuccess}/>
+                </DialogPage>
+        
+                <Link to={"/home@admin"}>
+                    Retour
+                </Link>
+                <Button 
+                    onClick={() => setIsOpen(true)}
+                >
+                    Insérer
+                </Button>
+        
+                {notification && (
+                    <div className="mb-4 p-4 bg-green-500 text-red rounded-lg shadow-lg text-center">
+                        {notification}
+                    </div>
+                )}
+        
+                {loading && <p>Chargement ...</p>}
+                {error && <p className="text-red-500">
+                    {error}    
+                </p>}
+                {!loading && !error &&(
+                    <CrudPage 
+                    keyMapping={keyMapping} 
+                    headers={tete} 
+                    data={frs} 
+                    onDelete= {handleDelete}
+                    onEdit={handleEdit}
+                    onSave={handleSave}
+                    onCancel={handleCancel}
+                    editingId={editingId}
+                    editData={editData}
+                    onEditChange={handleEditChange}
+                    fieldsTypes = {fieldsTypes}
+                />
+                )
+        
+                }
+            </div>
         </>
 }
 

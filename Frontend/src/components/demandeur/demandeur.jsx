@@ -51,9 +51,10 @@ function Demandeur(){
         try{
          const res = await articleService.getByDemande(demande.id);
          const lots = res.data.map((a) => ({
+           id : a.id || a.Id ,
            codeLot:     a.codeLot     || a.CodeLot     || "",
            designation: a.designation || a.Designation || "",
-           quantite:    a.quantite    || a.Quantite    || 0,
+          //  quantite:    a.quantite    || a.Quantite    || 0,
          }));
          setDetail({...demande, lots});
         }catch (err){
@@ -94,9 +95,10 @@ function Demandeur(){
                 return {
                   ...demande,
                   lots: articles.map((a) => ({
+                    id: a.id ?? a.Id ?? 0,  
                     codeLot: a.codeLot || "",
                     designation: a.designation || "",
-                    quantite: a.quantite || 0,
+                    // quantite: a.quantite || 0,
                   }))
                 };
               } catch (err) {
@@ -225,18 +227,30 @@ function Demandeur(){
     navigate("/login");
   }
 
-  const [filtrerDate, setFiltrerDate] = useState("");
-  const [filtrerStatus, setFiltrerStatus] = useState("");
-  const [filtrerLots, setFiltrerLots] = useState("");
+const [filtrerDate, setFiltrerDate] = useState("");
+   const [filtrerStatus, setFiltrerStatus] = useState("");
+   const [filtrerLots, setFiltrerLots] = useState("");
+   const [filtrerCodeLot, setFiltrerCodeLot] = useState("");
+   const [triDate, setTriDate] = useState("desc");
 
-  const demandesFiltrees = useMemo(() => {
-    return demandes.filter((d) => {
+const demandesFiltrees = useMemo(() => {
+    let result = demandes.filter((d) => {
       const matchDate = !filtrerDate || d.date?.slice(0, 10) === filtrerDate;
       const matchStatus = !filtrerStatus || d.status === filtrerStatus;
       const matchLots = !filtrerLots || (d.lots?.length ?? 0) === parseInt(filtrerLots);
-      return matchDate && matchLots && matchStatus
+      const matchCodeLot = !filtrerCodeLot || (d.lots?.some((lot) => lot.codeLot?.toLowerCase().includes(filtrerCodeLot.toLowerCase())));
+
+      return matchDate && matchLots && matchStatus && matchCodeLot;
     });
-  }, [demandes, filtrerDate, filtrerStatus, filtrerLots] );
+
+    result = result.sort((a, b) => {
+      const dateA = new Date(a.date);
+      const dateB = new Date(b.date);
+      return triDate === "desc" ? dateB - dateA : dateA - dateB;
+    });
+
+    return result;
+  }, [demandes, filtrerDate, filtrerStatus, filtrerLots, filtrerCodeLot, triDate] );
 
   return (
     <main>
@@ -404,12 +418,12 @@ function Demandeur(){
             <CardHeader>
               <nav className="navbar navbar-expand-lg bg-light shadow-sm rounded mb-4">
                 <div className="container-fluid">
-                  <span className="navbar-brand fw-bold">Filtres</span>
+                  <span className="navbar-brand fw-bold">Filtres</span><br></br>
 
-                  <div className="row g-3 w-100 align-items-end">
+                  <div className="row g-3 w-100">
 
                     
-                    <div className="col-md-3">
+                    <div className="col-md-2">
                       <label htmlFor="dateFilter" className="form-label">Date</label>
                       <Input
                         type="date"
@@ -417,17 +431,30 @@ function Demandeur(){
                         className="form-control"
                         value = {filtrerDate}
                         onChange={(e) => setFiltrerDate(e.target.value)}
+                        
                       />
                     </div>
+<div className="col-md-2">
+                      <label htmlFor="triDate" className="form-label">Trier par date</label>
+                      <select 
+                        id="triDate" 
+                        className="form-select"
+                        value={triDate}
+                        onChange={(e) => setTriDate(e.target.value)}
+                      >
+                        <option value="desc">Plus récent</option>
+                        <option value="asc">Plus ancien</option>
+                      </select>
+                    </div>
 
-                  
-                    <div className="col-md-3">
+                    <div className="col-md-2">
                       <label htmlFor="statusFilter" className="form-label">Statut</label>
                       <select 
                         id="statusFilter" 
                         className="form-select"
                         value = {filtrerStatus}
                         onChange={(e) => setFiltrerStatus(e.target.value)}
+                       
                       >
                         <option value="">Tous</option>
                         <option value="Nouvelle">Nouvelle</option>
@@ -438,7 +465,7 @@ function Demandeur(){
                     </div>
 
                   
-                    <div className="col-md-3">
+                    <div className="col-md-2">
                       <label htmlFor="lotsFilter" className="form-label">Nombre de lots</label>
                       <Input
                         type="number"
@@ -448,17 +475,39 @@ function Demandeur(){
                         placeholder="Ex: 3"
                         value = {filtrerLots}
                         onChange={(e) => setFiltrerLots(e.target.value)}
+                       
+                      />
+                    </div>
+
+                    <div className="col-md-2">
+                      <label htmlFor="codeLotFilter" className="form-label">Code Lot</label>
+                      <Input
+                        type="text"
+                        id="codeLotFilter"
+                        className="form-control"
+                        placeholder="Rechercher un code lot..."
+                        value={filtrerCodeLot}
+                        onChange={(e) => setFiltrerCodeLot(e.target.value)}
                       />
                     </div>
 
                     
-                    <div className="col-md-3 d-flex gap-2">
+
+                    
+                    <div className="col-md-2 "
+                      style={{
+                        position:"relative",
+                        marginTop:"3rem"
+                      }}
+                    >
                       <button
-                        className="btn btn-outline-secondary w-100"
+                        className="btn btn-outline-success w-100 bg-success text-white"
                         onClick={() => {
                           setFiltrerDate("");
                           setFiltrerStatus("");
                           setFiltrerLots("");
+                          setFiltrerCodeLot("");
+                          setTriDate("desc");
                         }}
                       >
                         Réinitialiser
@@ -497,6 +546,7 @@ function Demandeur(){
                <Table>
                  <TableHeader>
                    <TableRow>
+                    <TableHead>IdArticle</TableHead>
                      <TableHead>Code Lot</TableHead>
                      <TableHead>Désignation</TableHead>
                      {/* <TableHead>Quantité</TableHead> */}
@@ -504,7 +554,10 @@ function Demandeur(){
                  </TableHeader>
                  <TableBody>
                     {(detail.lots ?? []).map((a, i) => (
-                      <TableRow key={i}>
+                      <TableRow key={a.id || i}>
+                        <TableCell>
+                          {a.id}
+                        </TableCell>
                         <TableCell className="font-mono">
                           {a.codeLot || "—"}
                         </TableCell>
@@ -539,9 +592,9 @@ function DemandesTable({ data, onDetail, empty }) {
       <Table className="table">
         <TableHeader className="table_header">
           <TableRow className="bg-gray-50 text-gray-600">
-            <TableHead className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Numéro dossier</TableHead>
-            <TableHead className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Nombre de lots</TableHead>
+            {/* <TableHead className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Numéro dossier</TableHead> */}
             <TableHead className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Date</TableHead>
+            <TableHead className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Nombre de lots</TableHead>
             <TableHead className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
               Statut
             </TableHead>
@@ -551,21 +604,21 @@ function DemandesTable({ data, onDetail, empty }) {
         <TableBody className="divide-y divide-gray-100">
           {data.map((d) => (
             <TableRow key={d.id} className="transition-colors hover:bg-gray-50">
-              <TableCell className="px-4 py-3">
+              {/* <TableCell className="px-4 py-3">
                 <span className="inline-flex rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700">
                   {d.numDossier}
                 </span>
+              </TableCell> */}
+              <TableCell className="px-4 py-3 text-sm text-gray-600">
+                {new Date(d.date).toLocaleString("fr-FR")}
               </TableCell>
               <TableCell className="px-4 py-3">
                 <span className="inline-flex items-center justify-center rounded-full bg-blue-50 px-2.5 py-0.5 text-sm font-medium text-blue-700">
                   {d.lots?.length ?? 0}
                 </span>
               </TableCell>
-              <TableCell className="px-4 py-3 text-sm text-gray-600">
-                {new Date(d.date).toLocaleString("fr-FR")}
-              </TableCell>
               <TableCell className="px-4 py-3" style = {{ color : "white" ,
-                background : d.status === "Nouvelle" ? "blue" : d.status === "En attente" ? "yellow" : d.status === "Validé" ? "green" : "red"
+                background : d.status === "Nouvelle" ? "blue" : d.status === "En attente" ? "yellow" : d.status === "Validée" ? "green" : "red"
               }}>
                 {d.status}
               </TableCell>

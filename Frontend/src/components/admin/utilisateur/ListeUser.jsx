@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import CrudPage from "../../../page/crud_page";
 import { useEffect, useState } from "react";
 import DialogPage from "../../../page/dialog_page";
@@ -7,6 +7,7 @@ import { Button } from "../../../components/ui/button";
 import "./ListeUser.css";
 import { userService } from "../../../services/api";
 import Nav from "../../nav/nav";
+import { useAuth } from "../../../context/AuthContext";
 
 function ListeUser(){
   const tete = ["NOM" , "PRENOM" , "MATRICULE", "MAIL", "FIXE", "ROLE", "SITE"];
@@ -149,10 +150,22 @@ function ListeUser(){
           setEditingId(null);
           setEditData({});
       };
-  
+  const { user, logout } = useAuth();
+    const navigate = useNavigate();
+
+    const handleLogout = () => {
+        logout();
+        navigate("/login");
+    }
+
+    const handleLogoutWithConfirmation = () => {
+        if (window.confirm("Voulez-vous vraiment vous déconnecter ?")) {
+            handleLogout();
+        }
+    };
   
   return<>
-    <Nav />
+   <Nav/>
     <DialogPage
         isOpen={isOpen}
         onClose={()=>setIsOpen(false)}

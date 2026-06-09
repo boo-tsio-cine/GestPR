@@ -48,6 +48,10 @@ function HistoriqueTaux(){
 
     return<>
     <Nav/>
+    <div style={{
+        paddingTop:"5rem"
+    }}>
+        
         <Link to={"/taux/ListeTaux"}>
             Retour
         </Link>
@@ -72,6 +76,7 @@ function HistoriqueTaux(){
         )
 
         }
+    </div>
     </>
 }
 

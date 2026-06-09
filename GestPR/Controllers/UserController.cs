@@ -1,5 +1,6 @@
 ﻿using GestPR.Data;
 using GestPR.Models;
+using GestPR.Service;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,16 +12,17 @@ namespace GestPR.Controllers
     {
         private readonly AppDbContext _context;
 
-        public UserController(AppDbContext context)
+        public UserController(IUserService context)
         {
-            _context = context; //Injections de dépendances automatique
+            _context = context;
         }
 
         // GET: api/users
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<User>>> GetAll()
+        public async Task<IActionResult> GetAll()
         {
-            return await _context.Users.ToListAsync();
+            var user = await _context.GetAllAsync();
+            return Ok(user);
         }
 
         // POST: api/users

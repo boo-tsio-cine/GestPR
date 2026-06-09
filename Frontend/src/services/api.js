@@ -59,10 +59,11 @@ export const frsService = {
 };
 
 export const origineService = {
-  getAll: () => api.get("/origine/"),
-  create: (data) => api.post("/origine/", data),
-  delete: (id) =>api.delete(`/origine/${id}`),
-  update: (id, data) => api.put(`/origine/${id}`, data),
+  getAll: () => api.get("/origines/"),
+  getById: (id) => api.get(`/origines/${id}`),
+  create: (data) => api.post("/origines/", data),
+  delete: (id) =>api.delete(`/origines/${id}`),
+  update: (id, data) => api.put(`/origines/${id}`, data),
 
 };
 

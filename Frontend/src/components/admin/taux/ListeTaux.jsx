@@ -152,21 +152,42 @@ function ListeTaux(){
             <UserForm onSuccess={handleSuccess}/>
         </DialogPage>
         <div style={{
-            paddingTop :"5rem"
+            paddingTop :"7rem",
+            display:"flex",
+            paddingLeft:"2rem",
+            gap:"2rem",
         }}>
 
-            <Link to={"/home@admin"}>
+            <Link to={"/home@admin"} style={{
+                textDecoration: "none",
+                color : "white",
+                display:"flex",
+                alignItems:"center",
+                justifyContent:"center",
+                width:"6rem"
+                
+            }} className="bg-secondary">
                 Retour
             </Link>
-            <Link to={"/taux/Historique"}>
-                Historique
+            <Link to={"/taux/Historique"} style={{
+                textDecoration: "none",
+                color : "white",
+                display:"flex",
+                alignItems:"center",
+                justifyContent:"center",
+                width:"6rem"
+                
+            }} className="bg-info">
+                <div>
+                    Historique
+                </div>
             </Link>
+            <Button 
+                onClick={() => setIsOpen(true)}
+            >
+                Insérer
+            </Button>
         </div>
-        <Button 
-            onClick={() => setIsOpen(true)}
-        >
-            Insérer
-        </Button>
 
         {notification && (
             <div className="mb-4 p-4 bg-green-500 text-red rounded-lg shadow-lg text-center">

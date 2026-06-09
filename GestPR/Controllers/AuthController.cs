@@ -55,7 +55,6 @@ namespace GestPR.Controllers
             return Ok("Mot de passe créé avec succès. Vous pouvez maintenant vous connecter.");
         
         
-        
         }
 
 
