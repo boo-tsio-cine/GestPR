@@ -1,4 +1,5 @@
 ﻿using GestPR.Data;
+using GestPR.Dtos;
 using GestPR.Models;
 using GestPR.Service;
 using Microsoft.AspNetCore.Mvc;
@@ -10,71 +11,95 @@ namespace GestPR.Controllers
     [Route("api/utilisateurs")]
     public class UserController : ControllerBase  // ← ControllerBase, pas Controller
     {
-        private readonly AppDbContext _context;
+        private readonly IUserService _service;
 
-        public UserController(IUserService context)
+        public UserController(IUserService service)
         {
-            _context = context;
+            _service = service;
         }
 
         // GET: api/users
-        [HttpGet]
+        [HttpGet]   
         public async Task<IActionResult> GetAll()
         {
-            var user = await _context.GetAllAsync();
+            var user = await _service.GetAllAsync();
             return Ok(user);
+        }
+
+        //récupérer par Id
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetById(int id)
+        {
+            try
+            {
+                var user = await _service.GetByIdAsync(id);
+                return Ok(user);
+            }
+            catch (KeyNotFoundException)
+            {
+                return NotFound(new { message = $"Utilisateur {id} introuvable" });
+            }
         }
 
         // POST: api/users
         [HttpPost]
-        public async Task<ActionResult<User>> Create([FromBody] User user) //[FromBody] est obligatoire pour lire le JSON envoyé par React 
+        public async Task<IActionResult> Create([FromBody] UserCreateDDto dto) //[FromBody] est obligatoire pour lire le JSON envoyé par React 
         {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
+            try
+            {
+                var created = await _service.CreateAsync(dto);
+                return Ok(created);
 
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetAll), new { id = user.Id }, user);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
         //Put : api/user/5
         [HttpPut("{id}")]
-        public async Task<ActionResult> Update(int id, [FromBody] User user)
+        public async Task<IActionResult> Update(int id, [FromBody] UserUpdateDDto dto)
         {
-            if (id != user.Id)
-                return BadRequest("L'id ne correspond pas");
-
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
-            _context.Entry(user).State = EntityState.Modified;
-
-            try
+            if (id != dto.Id)
             {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!_context.Users.Any(t => t.Id == id))
-                    return NotFound();
-                throw;
+                return BadRequest(
+                     "L'ID de l'URL doit correspondre à l'ID du corps de la requête"
+                );
             }
 
+            var isUpdated = await _service.UpdateUserAsync(id, dto);
+
+            if (!isUpdated)
+            {
+                return NotFound($"Utilisateur {id} introuvable" );
+            }
             return NoContent();
         }
+
+
+        [HttpPatch("{id}/change-password")]
+        public async Task<IActionResult> UpdatePassword(int id, [FromBody] UserUpdatePasswordDDto dto)
+        {
+            if (id != dto.Id)
+            {
+                return BadRequest(
+                     "L'ID de l'URL doit correspondre à l'ID du corps de la requête"
+                );
+            }
+            var isUpdated = await _service.UpdateUserPasswordAsync(id, dto);
+            if (!isUpdated)
+            {
+                return NotFound($"Utilisateur {id} introuvable");
+            }
+            return NoContent();
+        }
+
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var user = await _context.Users.FindAsync(id);
-
-            if (user == null)
-                return NotFound();
-
-            _context.Users.Remove(user);
-            await _context.SaveChangesAsync();
-
+            await _service.DeleteAsync(id);
             return NoContent();
         }
 

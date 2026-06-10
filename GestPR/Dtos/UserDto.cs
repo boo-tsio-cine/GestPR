@@ -26,4 +26,23 @@ namespace GestPR.Dtos
         public string Site { get; set; } = "";
 
     }
+
+    public class UserUpdateDDto
+    {
+        public int Id { get; set; }
+        public string Nom { get; set; } = "";
+        public string Prenom { get; set; } = "";
+        public string Matricule { get; set; } = "";
+        public string Mail { get; set; } = "";
+        public string? Fixe { get; set; } = "";
+        public string Role { get; set; } = "";
+        public string Site { get; set; } = "";
+    }
+
+   public class UserUpdatePasswordDDto
+    {
+        public int Id { get; set; }
+        public string OldPassword { get; set; } = "";
+        public string NewPassword { get; set; } = "";
+    }
 }

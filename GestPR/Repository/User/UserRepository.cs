@@ -8,9 +8,9 @@ namespace GestPR.Repository
     {
         private readonly AppDbContext _db;
 
-        public UserRepository(AppDbContext db) 
+        public UserRepository(AppDbContext db)
         {
-            _db = db;    
+            _db = db;
         }
 
         //Ajouter
@@ -30,7 +30,7 @@ namespace GestPR.Repository
 
         public async Task<User> CreateAsync(User user)
         {
-            _db.Users .Add(user);
+            _db.Users.Add(user);
             await _db.SaveChangesAsync();
             return user;
         }
@@ -39,12 +39,26 @@ namespace GestPR.Repository
         public async Task DeleteAsync(int id)
         {
             var user = await _db.Users.FindAsync(id);
-            if (user != null) 
+            if (user != null)
             {
                 _db.Users.Remove(user);
                 await _db.SaveChangesAsync();
             }
+        }
+
+        //UpdateAsync
+        public async Task UpdateAsync(User user)
+        {
+            _db.Users.Update(user);
+            await _db.SaveChangesAsync();
 
 
+        }
+
+        public async Task UpdatePasswordAsync(User user)
+        {
+            _db.Users.Update(user);
+            await _db.SaveChangesAsync();
+        }
     }
 }
