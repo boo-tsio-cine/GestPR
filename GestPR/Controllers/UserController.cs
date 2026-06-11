@@ -78,21 +78,22 @@ namespace GestPR.Controllers
         }
 
 
-        [HttpPatch("{id}/change-password")]
+        [HttpPatch("password")]
         public async Task<IActionResult> UpdatePassword(int id, [FromBody] UserUpdatePasswordDDto dto)
         {
-            if (id != dto.Id)
+            try
             {
-                return BadRequest(
-                     "L'ID de l'URL doit correspondre à l'ID du corps de la requête"
-                );
+                await _service.UpdateUserPasswordAsync(id, dto);
+                return Ok(new { message = "Mot de passe mis à jour avec succès" });
             }
-            var isUpdated = await _service.UpdateUserPasswordAsync(id, dto);
-            if (!isUpdated)
+            catch (KeyNotFoundException ex)
+            {   
+                return NotFound(new { message = ex.Message });
+            }
+            catch(ArgumentException ex)
             {
-                return NotFound($"Utilisateur {id} introuvable");
+                return BadRequest(new { message = ex.Message });
             }
-            return NoContent();
         }
 
 

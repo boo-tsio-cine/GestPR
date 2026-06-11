@@ -1,6 +1,8 @@
 ﻿using GestPR.Data;
 using GestPR.Repository;
+using GestPR.Repository.Demandes;
 using GestPR.Service;
+using GestPR.Service.Demandes;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -99,6 +101,8 @@ namespace GestPR
             builder.Services.AddScoped<IUserRepository, UserRepository>();
             builder.Services.AddScoped<IUserService, UserService>();
 
+            builder.Services.AddScoped<IDemandeRepository, DemandeRepository>();
+            builder.Services.AddScoped<IDemandeService, DemandeService>();
 
 
 

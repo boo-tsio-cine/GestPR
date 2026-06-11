@@ -19,7 +19,7 @@ namespace GestPR.Controllers
         public async Task<ActionResult<Article>> Create([FromBody] Article article)
         {
             //Vérifier que le demande existe
-            var demande = await _context.Demande.FindAsync(article.IdDemande);
+            var demande = await _context.Demande.FindAsync(article.DemandeId);
             if (demande == null)
                 return BadRequest("La demande n'existe pas");
 
@@ -47,7 +47,7 @@ namespace GestPR.Controllers
         public async Task<ActionResult<IEnumerable<Article>>> GetByDemande([FromQuery] int idDemande)
         {
             var articles = await _context.Article
-                .Where(a => a.IdDemande == idDemande)
+                .Where(a => a.DemandeId == idDemande)
                 .ToListAsync();
 
             return Ok(articles);

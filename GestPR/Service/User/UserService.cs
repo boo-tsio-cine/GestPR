@@ -1,4 +1,5 @@
-﻿using GestPR.Dtos;
+﻿using BCrypt.Net;
+using GestPR.Dtos;
 using GestPR.Models;
 using GestPR.Repository;
 using Microsoft.AspNetCore.Identity;
@@ -101,46 +102,32 @@ namespace GestPR.Service
 
         public async Task<bool> UpdateUserPasswordAsync(int id, UserUpdatePasswordDDto dto)
         {
-            var user = await _repository.GetByIdAsync(id);
-            if (user == null)
+            var user = await _repo.GetByIdAsync(id)
+                ?? throw new KeyNotFoundException($"Utilisateur {id} introuvable");
+
+            //Cas 1 : si le mot de passe est null, on le crée
+            if (user.PasswordHash == null)
             {
-                return false;
-            }
-            // 2. GESTION DU CAS NULL : Si l'utilisateur n'a PAS ENCORE de mot de passe
-            if (string.IsNullOrEmpty(user.PasswordHash))
-            {
-                // On passe directement au hachage du nouveau mot de passe
-                user.PasswordHash = _passwordHasher.HashPassword(user, dto.NewPassword); // Ou gérer ce cas selon ta logique métier (ex: forcer la réinitialisation du mot de passe)
+                user.PasswordHash = BCrypt.Net.BCrypt.HashPassword( dto.NewPassword);
             }
             else
             {
-                // Sinon, s'il y a déjà un mot de passe, on exige et vérifie l'ancien
-                if (string.IsNullOrEmpty(dto.OldPassword))
-                {
-                    // Si l'ancien mot de passe n'est pas fourni, on considère que la validation a échoué
-                    return false;
-                }
+                //Cas 2 : si le mot de passe existe déjà, on vérifie l'ancien mot de passe
+                if (string.IsNullOrWhiteSpace(dto.OldPassword))
+                    throw new ArgumentException("L'ancien mot de passe est obligatoire");
 
-                var verificationResult = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, dto.OldPassword);
+                if (!BCrypt.Net.BCrypt.Verify(dto.OldPassword, user.PasswordHash))
+                    throw new ArgumentException("L'ancien mot de passe est incorrect");
 
-                if (verificationResult == PasswordVerificationResult.Failed)
-                    return false;
-
-                // 3. Hachage du nouveau mot de passe
-                user.PasswordHash = _passwordHasher.HashPassword(user, dto.NewPassword);
+                user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
             }
 
-            // Sécurité : On s'assure que PasswordHash en BDD n'est pas null pour éviter le warning CS8604
-            string currentHash = user.PasswordHash ?? string.Empty;
 
+            //Valider le nouveau mot de passe
+            if (string.IsNullOrWhiteSpace(dto.NewPassword) || dto.NewPassword.Length < 6)
+                throw new ArgumentException("Le nouveau mot de passe doit contenir au moins 6 caractères");
             //bool isOldPasswordValid = _passwordHasher.VerifyHashedPassword(user.PasswordHash, dto.OldPassword);
-           
-
-            
-
-            // 4. Mise à jour globale de l'entité utilisateur
-            // REMARQUE : Utilise la méthode de mise à jour que ton IUserRepository possède déjà (ex: UpdateAsync ou Update)
-            await _repository.UpdateAsync(user);
+            await _repo.UpdateAsync(user);
             return true;
         }
     }

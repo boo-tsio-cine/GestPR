@@ -1,74 +1,59 @@
-﻿using GestPR.Data;
+﻿// Controllers/DemandeController.cs
 using GestPR.Dtos;
-using GestPR.Models;
-using Microsoft.AspNetCore.Http;
+
+using GestPR.Service.Demandes;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace GestPR.Controllers
 {
     [ApiController]
     [Route("api/demandes")]
-
-    public class DemandeControlleur : ControllerBase
+    public class DemandeController : ControllerBase
     {
-        private readonly AppDbContext _context;
+        private readonly IDemandeService _service;
 
-        public DemandeControlleur(AppDbContext context)
+        public DemandeController(IDemandeService service)
         {
-            _context = context;
+            _service = service;
         }
 
-        // GET: api/demandes — liste des demandes du demandeur connecté
+        // GET api/demandes?idDemandeur=1
         [HttpGet]
-        public async Task<ActionResult> GetAll([FromQuery] int idDemandeur)
+        public async Task<IActionResult> GetByUser([FromQuery] int idDemandeur)
         {
-           var demandes = await _context.Demande
-                .Where(d => d.IdDemandeur == idDemandeur)
-                .Include(d => d.Articles)
-                .OrderByDescending(d => d.DateTime)
-                .Select(d => new
-                {
-                    id = d.Id,
-                    numDossier = d.NumDossier,
-                    motif = d.Motif,
-                    status = d.Status,
-                    dateTime = d.DateTime,
-                    articles = d.Articles.Select(a => new
-                    {
-                        id = a.Id,
-                        codeLot = a.CodeLot,
-                        designation = a.Designation,
-
-                    })
-                })
-                .ToArrayAsync();
-
+            var demandes = await _service.GetByUserAsync(idDemandeur);
             return Ok(demandes);
         }
 
-        // POST: api/demandes — créer l'entête
-
-        [HttpPost]
-        public async Task<ActionResult<Demande>> Create([FromBody] DemandeCreateDto dto)
+        // GET api/demandes/5
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetById(int id)
         {
-            var demande = new Demande()
+            try
             {
-                IdDemandeur = dto.IdDemandeur,
-                Motif = dto.Motif ?? "En attente",
-                NumDossier = $"DEM-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..6].ToUpper()}",
-                Status = "Nouvelle",
-                DateTime = DateTime.UtcNow
-
-            };
-
-            _context.Demande.Add(demande);
-            await _context.SaveChangesAsync();
-
-            return Ok(new { id = demande.Id, numDossier = demande.NumDossier });
-            
-                           
+                var demande = await _service.GetByIdAsync(id);
+                return Ok(demande);
+            }
+            catch (KeyNotFoundException)
+            {
+                return NotFound(new { message = $"Demande {id} introuvable" });
+            }
         }
 
+        // POST api/demandes
+        [HttpPost]
+        public async Task<IActionResult> Create(
+            [FromBody] DemandeAvecArticleCreateDto dto)
+        {
+            try
+            {
+                var created = await _service.CreateAvecArticlesAsync(dto);
+                return Ok(created);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
     }
 }
