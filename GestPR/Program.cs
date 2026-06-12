@@ -1,8 +1,10 @@
 ﻿using GestPR.Data;
 using GestPR.Repository;
 using GestPR.Repository.Demandes;
+using GestPR.Repository.Taux_Historic;
 using GestPR.Service;
 using GestPR.Service.Demandes;
+using GestPR.Service.Taux_Historic;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -104,7 +106,8 @@ namespace GestPR
             builder.Services.AddScoped<IDemandeRepository, DemandeRepository>();
             builder.Services.AddScoped<IDemandeService, DemandeService>();
 
-
+            builder.Services.AddScoped<ITauxRepository, TauxRepository>();
+            builder.Services.AddScoped<ITauxService, TauxService>();
 
 
             var app = builder.Build();

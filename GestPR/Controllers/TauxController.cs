@@ -1,5 +1,7 @@
 ﻿using GestPR.Data;
+using GestPR.Dtos;
 using GestPR.Models;
+using GestPR.Service.Taux_Historic;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -13,92 +15,96 @@ namespace GestPR.Controllers
     public class TauxController : ControllerBase
     {
 
-        private readonly AppDbContext _context;
+        private readonly ITauxService _service;
 
-        public TauxController(AppDbContext context) { _context = context; }
+        public TauxController(ITauxService service)
+        {
+            _service = service;
+        }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Taux>>> GetAll()
+        public async Task<IActionResult> GetAll()
         {
-            return await _context.Taux.ToListAsync();
+            var taux = await _service.GetAllTauxAsync();
+            return Ok(taux);
         }
-        
-        // POST: api/taux
+
+
+
+        //création taux
         [HttpPost]
-        public async Task<ActionResult<Taux>> Create([FromBody] Taux taux) //[FromBody] est obligatoire pour lire le JSON envoyé par React 
+        public async Task<IActionResult> Create([FromBody] tauxCreateDto dto)//[FromBody] est obligatoire pour lire le JSON envoyé par React 
         {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
-            _context.Taux.Add(taux);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetAll), new { id = taux.Id }, taux);
-        }
-
-        //Put : api/taux/5
-        [HttpPut("{id}")]
-        public async Task<ActionResult> Update(int id, [FromBody] Taux taux)
-        {
-
-
-
-            if (id != taux.Id)
-                return BadRequest("L'id ne correspond pas");
-
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
-            //récupérer l'ancien taux avant la modificatioo
-            var ancienTaux = await _context.Taux
-                .AsNoTracking() // important - ne pas tracker cet objet
-                .FirstOrDefaultAsync(t => t.Id == id);
-
-            if (ancienTaux == null)
-                return NotFound();
-
-            // ✅ 2. Modifier le taux
-
-            _context.Entry(taux).State = EntityState.Modified;
-
-            // ✅ 3. Créer l'entrée historique
-            var historique = new TauxHistorique
-            {
-                NomTaux = ancienTaux.Nom,
-                AncienValeur = ancienTaux.valeur,
-                NouvelleValeur = taux.valeur,
-                DateTime = DateTime.UtcNow
-            };
-
-            _context.TauxHistorique.Add(historique);
-
             try
             {
-                // ✅ 4. Sauvegarder les deux en une seule transaction
-                await _context.SaveChangesAsync();
+                var created = await _service.CreateAsync(dto);
+                return Ok(created); // 200 OK avec le taux créé en réponse
             }
-            catch (DbUpdateConcurrencyException)
+            catch (ArgumentException ex)
             {
-                if (!_context.Taux.Any(t => t.Id == id))
-                    return NotFound();
-                throw;
+                return BadRequest(new
+                {
+                    message = ex.Message
+                });
             }
-
-            return NoContent();
         }
 
+        //// GET api/taux/3/historique
+        ///
+        [HttpGet("{id}/historique")]
+        public async Task<IActionResult> GetHistoriqueAsync(int idTaux)
+        {
+            try
+            {
+                var historique = await _service.GetHistoriqueAsync(idTaux);
+                return Ok(historique);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new
+                {
+                    message = ex.Message
+                });
+            }
+
+
+        }
+
+        // PUT api/taux/3
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(int id, [FromBody] tauxUpdateDto dto)
+        {
+            try
+            {
+                var updated = await _service.UpdateAsync(id, dto);
+                return Ok(updated);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new
+                {
+                    message = ex.Message
+                });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new
+                {
+                    message = ex.Message
+                });
+            }
+
+        }
+
+        // DELETE api/taux/3
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var taux = await _context.Taux.FindAsync(id);
-
-            if(taux == null)    
-                return NotFound();
-
-            _context.Taux.Remove(taux);
-            await _context.SaveChangesAsync();
-            return NoContent(); //204 -- succès sans contenu
-
+           
+                await _service.DeleteAsync(id);
+                return NoContent(); // 204 No Content
+          
         }
+
     }
 }
