@@ -1,4 +1,5 @@
-﻿using GestPR.Data;
+﻿using Star.Security.Ldap;
+using GestPR.Data;
 using GestPR.Repository;
 using GestPR.Repository.Demandes;
 using GestPR.Repository.Taux_Historic;
@@ -20,6 +21,11 @@ namespace GestPR
         public static void Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
+
+            builder.Services.AddStarLdapAuthentication(builder.Configuration);
+
+            var app = builder.Build();
+
 
             // Add services to the container.
             var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
@@ -110,7 +116,7 @@ namespace GestPR
             builder.Services.AddScoped<ITauxService, TauxService>();
 
 
-            var app = builder.Build();
+           
 
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())

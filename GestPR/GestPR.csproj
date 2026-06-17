@@ -26,4 +26,8 @@
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\StarLdapSolution\Star.Security.Ldap\Star.Security.Ldap.csproj" />
+  </ItemGroup>
+
 </Project>
