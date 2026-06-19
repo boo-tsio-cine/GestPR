@@ -15,7 +15,12 @@
     {
         public int Id { get; set; }
         public string Nom { get; set; } = "";
+        public string cle { get; set; } = "";
+        public string unite { get; set; } = "";
+        public string description { get; set; } = "";
+        public string produit { get; set; } = "";
         public decimal valeur { get; set; }
+
     }
 
     public class tauxUpdateDto

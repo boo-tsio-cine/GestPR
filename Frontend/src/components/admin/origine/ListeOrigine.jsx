@@ -5,6 +5,7 @@ import { Button } from "../../ui/button";
 import CrudPage from "../../../page/crud_page";
 import { origineService } from "../../../services/api";
 import Nav from "../../nav/nav";
+import listPays from "../../../data/pays.json";
 
 function ListeOrigine(){
       const tete = ["PAYS"];
@@ -32,7 +33,7 @@ function ListeOrigine(){
                 const response = await origineService.getAll();
                 setOrigine(response.data);
             }catch(err){
-                setError("Erreru", err)
+                setError(err.message || "Erreur de chargement")
             }finally{
                 setLoading(false);
             }
@@ -102,24 +103,23 @@ function ListeOrigine(){
                   };
               
                   // Clic sur ✅ — sauvegarder
-                  const handleSave = async () => {
-                      try{
-                          const dataToSend = {
-                              ...editData,
-                              valeur: parseFloat(editData.valeur) || 0, //string->number
-                          };
-              
-                          await origineService.update(editingId, dataToSend);
-                          setNotification("Modification enregistrée");
-                          setTimeout(() => setNotification(null), 3000);
-                          setEditingId(null); // quitter le mode édition
-                          fetchOrigine(); // recharger la liste
-              
-                      }catch (err) {
-                          console.error("Erreur update:", err.response?.data);
-                          setNotification("Erreur lors de la modification.");
-                      }
-                  };
+const handleSave = async () => {
+                       try{
+                           const dataToSend = {
+                               ...editData,
+                           };
+
+                           await origineService.update(editingId, dataToSend);
+                           setNotification("Modification enregistrée");
+                           setTimeout(() => setNotification(null), 3000);
+                           setEditingId(null); // quitter le mode édition
+                           fetchOrigine(); // recharger la liste
+
+                       }catch (err) {
+                           console.error("Erreur update:", err.response?.data);
+                           setNotification("Erreur lors de la modification.");
+                       }
+                   };
               
                   // Clic sur ❌ — annuler sans sauvegarder
                   const handleCancel = () => {
@@ -241,27 +241,9 @@ function UserForm({ onSuccess }){
         }
     };
 
-    const [pays, setPays] = useState([]);
-    const [loading, setLoading] = useState(true);
+ 
 
-    useEffect(() => {
-        fetch("https://restcountries.com/v3.1/all?fields=name,cca2,flag")
-            .then(res=>res.json())
-            .then(data => {
-                const liste = data
-                    .map(p=> ({
-                        code: p.cca2,
-                        nom : p.name.common,
-                        drapeau : p.flag
-                    }))
-
-                    .sort((a,b) => a.nom.localeCompare(b.nom));
-                setPays(liste);
-                setLoading(false);
-            })
-            .catch(()=> setLoading(false));
-    }, []);
-
+    
     return<>
         <form className="space-y-4 form-user" onSubmit={handleSubmit}>
 
@@ -285,10 +267,10 @@ function UserForm({ onSuccess }){
                     required
                 >
                     <option value="">
-                        {loading ? "Chargement des pays..." : "Sélectionner un pays d'origine"}
+                        Sélectionner un pays d'origine...
                     </option>
                     {
-                        pays.map(p=>(
+                        listPays.map(p => (
                             <option key={p.code} value={p.nom}>
                                 {p.drapeau} {p.nom}
                             </option>

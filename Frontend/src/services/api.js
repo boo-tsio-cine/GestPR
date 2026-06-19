@@ -1,25 +1,33 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  baseURL: "http://localhost:5233/api",
+  withCredentials:true,
   headers: {
     "Content-Type": "application/json",
   },
 });
 
-// ✅ Intercepteur — ajoute le token automatiquement à chaque requête
+// ✅ Intercepteur — ajoute le token automatiquement uniquement s'il existe
 api.interceptors.request.use((config) => {
   const stored = localStorage.getItem("gestpr_user");
 
-  if(stored) {
-    const { token } = JSON.parse(stored);
-    config.headers.Authorization = `Bearer ${token}`;
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored);
+      // On n'injecte le Header Authorization QUE si un token JWT est explicitement présent
+      if (parsed && parsed.token) {
+        config.headers.Authorization = `Bearer ${parsed.token}`;
+      }
+    } catch (e) {
+      console.error("Erreur de lecture du localStorage", e);
+    }
   }
 
   return config;
-
+}, (error) => {
+  return Promise.reject(error);
 });
-
 
 // ✅ Intercepteur — si 401 → rediriger vers login
 api.interceptors.response.use(
@@ -34,14 +42,13 @@ api.interceptors.response.use(
   }
 );
 
-
 export const userService = {
-  getAll: () => api.get("/utilisateurs/"),
-  create: (data) => api.post("/utilisateurs/", data),
-  update: (id, data) => api.put(`/utilisateurs/${id}`, data),
-  delete: (id) =>api.delete(`/utilisateurs/${id}`),
+  // Changement des routes pour pointer vers AuthController qui gère star_identity_db
+  getAll: () => api.get("/Auth/utilisateurs/"),
+  create: (data) => api.post("/Auth/utilisateurs", data),
+  update: (id, data) => api.put(`/Auth/utilisateurs/${id}`, data),
+  delete: (id) => api.delete(`/Auth/utilisateurs/${id}`), // Optionnel si vous gérez la suppression
 };
-
 
 export const tauxService = {
   getAll: () => api.get("/taux/"),
@@ -51,7 +58,7 @@ export const tauxService = {
 };
 
 export const frsService = {
-  getAll: () => api.get("/frs/"),
+  getAll: () => api.get("/frs"),
   create: (data) => api.post("/frs/", data),
   delete: (id) =>api.delete(`/frs/${id}`),
   update: (id, data) => api.put(`/frs/${id}`, data),
@@ -74,11 +81,9 @@ export const tauxHistoriqueService = {
  };
 
 export const authService = {
-   // Inscription — première connexion
-  inscription: (data) => api.post("/auth/inscription", data),
+   
 
-  // Connexion — retourne le token JWT
-  connexion: (data) => api.post("/auth/connexion", data),
+  connexionAutomatiqueWindows:()=>api.get("/Auth/windows-login"),
 }
 
 export const demandeService = {

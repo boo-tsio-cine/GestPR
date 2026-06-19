@@ -105,24 +105,24 @@ function ListeFournisseur(){
               };
           
               // Clic sur ✅ — sauvegarder
-              const handleSave = async () => {
-                  try{
-                      const dataToSend = {
-                          ...editData,
-                          valeur: parseFloat(editData.valeur) || 0, //string->number
-                      };
-          
-                      await frsService.update(editingId, dataToSend);
-                      setNotification("Modification enregistrée");
-                      setTimeout(() => setNotification(null), 3000);
-                      setEditingId(null); // quitter le mode édition
-                      fetchFrs(); // recharger la liste
-          
-                  }catch (err) {
-                      console.error("Erreur update:", err.response?.data);
-                      setNotification("Erreur lors de la modification.");
-                  }
-              };
+            const handleSave = async () => {
+                try {
+                    // On nettoie l'objet pour n'envoyer que ce que le modèle C# attend
+                    const dataToSend = {
+                        id: editData.id,
+                        nom_frs: editData.nom_frs
+                    };
+
+                    await frsService.update(editingId, dataToSend);
+                    setNotification("Modification enregistrée avec succès !");
+                    setTimeout(() => setNotification(null), 3000);
+                    setEditingId(null); // Quitter le mode édition inline
+                    fetchFrs(); // Recharger le tableau
+                } catch (err) {
+                    console.error("Erreur update:", err.response?.data);
+                    setNotification("Erreur lors de la modification.");
+                }
+            };
           
               // Clic sur ❌ — annuler sans sauvegarder
               const handleCancel = () => {
@@ -228,17 +228,15 @@ function UserForm({ onSuccess }){
                 nom_frs : ""
             });
             if(onSuccess) onSuccess("Fournisseur bien enregistré !");
-        }catch (err){
+        } catch (err) {
             setStatus("error");
-            if(err.response?.data){
+            if (err.response?.data) {
                 setError(err.response.data || {});
                 setMessage("Veuillez corriger les erreurs dans le formulaire.");
+                console.error("Erreur serveur:", err.response.data); 
             } else {
-                setMessage("Erreur: " + err.message);
+                setMessage("Impossible de joindre le serveur : " + err.message);
             }
-            console.error("Erreur serveur:", err.response?.data); 
-            console.error("Erreurs détail:", err.response?.data?.errors);
-            console.log(err.response.data);
         }
     };
 

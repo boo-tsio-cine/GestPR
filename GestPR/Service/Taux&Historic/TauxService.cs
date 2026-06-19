@@ -122,7 +122,12 @@ namespace GestPR.Service.Taux_Historic
         {
             Id = o.Id,
             Nom = o.Nom,
+            cle = o.cle,
             valeur = o.valeur,
+            unite = o.unite, // Mappe la colonne 'unite' de la BDD vers 'utite' du DTO
+            description = o.description,
+            produit = o.produit,
+            
         };
 
 

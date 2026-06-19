@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import logo from './logo.png';
 
@@ -13,7 +13,7 @@ function Nav(){
     const navigate = useNavigate();
 
     const handleLogout = () => {
-        logout();
+        localStorage.removeItem("gestpr_user");
         navigate("/login");
     }
 
@@ -22,6 +22,12 @@ function Nav(){
             handleLogout();
         }
     };
+
+    const storedUser = JSON.parse(localStorage.getItem("gestpr_user"));
+    const userRole = storedUser?.role;
+    const userNom = storedUser?.nom;
+    const userPrenom = storedUser?.prenom;
+
 
     return<>
         <nav className="navbar  px-4" style={{
@@ -34,20 +40,42 @@ function Nav(){
             </div>
 
             <div className="d-flex align-items-center gap-3">
-                {/* Infos utilisateur */}
-                <span className="text-white">
-                {user?.prenom} {user?.nom} {user?.id}
-                <span className="badge bg-secondary ms-2">{user?.role}</span>
-                </span>
+                {/* 🏠 LIENS ACCESSIBLES PAR TOUT LE MONDE CONNECTÉ */}
+                {
+                    userRole === "Admin" && <Link className="nav-link" to="/home@admin">Tableau de bord</Link>
+                }
+                {
+                    userRole === "Demandeur" && <Link className="nav-link" to="/home@demandeur">Mes demandes</Link>
+                }
 
-                {/* Bouton déconnexion */}
-                <button
-                className="btn  btn-sm deconnexion"
-                onClick={handleLogoutWithConfirmation}
-                >
-                🚪 Déconnexion
-                </button>
-            </div>
+                {/* 🛠️ MENUS VISIBLES UNIQUEMENT PAR L'ADMIN */}
+                {
+                    userRole === "Admin" && (
+                        <>
+                            <Link className="nav-link" to="/utilisateur/ListeUser">Utilisateur</Link>
+                            <Link className="nav-link" to="/fournisseur/ListeFournisseur">Fournisseurs</Link>
+                            <Link className="nav-link" to="/taux/ListeTaux">Gestion des Taux</Link>
+                        </>
+                    )
+                }
+
+                
+                {/* 👤 INFOS UTILISATEUR ET DÉCONNEXION */}
+                    {storedUser && (
+                        <div className="d-flex align-items-center gap-3 text-white">
+                            {/* ✅ AFFICHAGE DU NOM ET PRÉNOM (Si dispo en BDD) SINON MATRICULE */}
+                            <small style={{ color : "white"}}>
+                                <strong>
+                                    {userPrenom && userNom 
+                                        ? `${userPrenom} ${userNom}` 
+                                        : username} ({userRole})
+                                </strong>
+                            </small>
+                           
+                        </div>
+                    )}
+                </div>
+                
             </nav>
     </>
 }

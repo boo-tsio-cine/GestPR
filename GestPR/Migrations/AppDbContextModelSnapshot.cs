@@ -35,16 +35,13 @@ namespace GestPR.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
-                    b.Property<int?>("DemandeId")
+                    b.Property<int>("DemandeId")
                         .HasColumnType("int");
 
                     b.Property<string>("Designation")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
-
-                    b.Property<int>("IdDemande")
-                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
@@ -64,20 +61,13 @@ namespace GestPR.Migrations
                     b.Property<DateTime>("DateTime")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("DemandeurId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("IdDemandeur")
+                    b.Property<int>("DemandeurId")
                         .HasColumnType("int");
 
                     b.Property<string>("Motif")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("NumDossier")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -190,7 +180,12 @@ namespace GestPR.Migrations
                     b.Property<decimal>("NouvelleValeur")
                         .HasColumnType("decimal(18,4)");
 
+                    b.Property<int>("TauxId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("TauxId");
 
                     b.ToTable("TauxHistorique");
                 });
@@ -203,43 +198,16 @@ namespace GestPR.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<DateTime>("DateTime")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Fixe")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Mail")
+                    b.Property<string>("AdUsername")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Matricule")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("Nom")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("PasswordHash")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Prenom")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
 
                     b.Property<string>("Role")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("Site")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 
@@ -248,25 +216,43 @@ namespace GestPR.Migrations
 
             modelBuilder.Entity("GestPR.Models.Article", b =>
                 {
-                    b.HasOne("GestPR.Models.Demande", "Demande")
+                    b.HasOne("GestPR.Models.Demande", null)
                         .WithMany("Articles")
-                        .HasForeignKey("DemandeId");
-
-                    b.Navigation("Demande");
+                        .HasForeignKey("DemandeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("GestPR.Models.Demande", b =>
                 {
                     b.HasOne("GestPR.Models.User", "Demandeur")
                         .WithMany()
-                        .HasForeignKey("DemandeurId");
+                        .HasForeignKey("DemandeurId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("Demandeur");
+                });
+
+            modelBuilder.Entity("GestPR.Models.TauxHistorique", b =>
+                {
+                    b.HasOne("GestPR.Models.Taux", "Taux")
+                        .WithMany("TauxHistoriques")
+                        .HasForeignKey("TauxId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Taux");
                 });
 
             modelBuilder.Entity("GestPR.Models.Demande", b =>
                 {
                     b.Navigation("Articles");
+                });
+
+            modelBuilder.Entity("GestPR.Models.Taux", b =>
+                {
+                    b.Navigation("TauxHistoriques");
                 });
 #pragma warning restore 612, 618
         }

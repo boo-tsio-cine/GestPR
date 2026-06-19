@@ -1,44 +1,29 @@
-
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
+function ProtectedRoute({ children, roles }) {
+    // 🟢 CORRECTION 1 : On récupère l'utilisateur depuis le contexte Auth
+    const { user } = useAuth(); 
+    
+    // 🟢 CORRECTION 2 : On appelle useLocation avec des parenthèses ()
+    const location = useLocation(); 
 
-function ProtectedRoute({children, roles}){
-    const { user, loading } = useAuth();
-    const location = useLocation;
-
-    // Attendre que la session soit restaurée
-    if (loading) {
-        return (
-        <div className="d-flex min-vh-100 justify-content-center align-items-center">
-            <div className="spinner-border text-primary" role="status">
-            <span className="visually-hidden">Chargement...</span>
-            </div>
-        </div>
-        );
-    }
-
-    // Pas connecté → redirection vers login
+    // Sécurité : Si l'utilisateur n'est pas du tout connecté, retour au login
     if (!user) {
-        return <Navigate to="/login" state={{ from: location }} replace />;
+        return <Navigate to="/" state={{ from: location }} replace />;
     }
 
-    // Connecté mais mauvais rôle → redirection vers login
-    if (roles && !roles.includes(user.role)) {
-        return (
-        <div className="d-flex min-vh-100 flex-column justify-content-center align-items-center">
-            <h1 className="display-1 fw-bold text-danger">403</h1>
-            <p className="fs-4">Accès interdit</p>
-            <p className="text-muted">Vous n'avez pas les droits pour accéder à cette page.</p>
-            <a href="/login" className="btn btn-primary mt-3">
-            Retour à la connexion
-            </a>
-        </div>
-        );
+    // Extraction du rôle (gère les majuscules/minuscules de l'API C#)
+    const userRole = user?.role || user?.Role;
+
+    // Si le rôle de l'utilisateur n'est pas autorisé pour cette route
+    if (roles && !roles.includes(userRole)) {
+        // Redirection vers une page 403 ou retour à l'accueil par défaut
+        return <Navigate to="/" replace />; 
     }
 
+    // Si tout est OK, on affiche la page demandée
     return children;
-
 }
 
 export default ProtectedRoute;
