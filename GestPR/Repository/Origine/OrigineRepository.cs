@@ -37,6 +37,13 @@ namespace GestPR.Repository
             return origine;
         }
 
+
+        public async Task<int> GetTotalOrigineCountAsync()
+        {
+            return await _db.Origine.CountAsync();
+        }
+
+
         // ✅ DeleteAsync — manquait
         public async Task DeleteAsync(int id)
         {

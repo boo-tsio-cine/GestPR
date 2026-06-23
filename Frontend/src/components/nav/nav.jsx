@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import logo from './logo.png';
 
@@ -9,25 +9,17 @@ import "./nav.css";
 
 function Nav(){
 
-    const { user, logout } = useAuth();
-    const navigate = useNavigate();
+    const { user } = useAuth();
+    
 
-    const handleLogout = () => {
-        localStorage.removeItem("gestpr_user");
-        navigate("/login");
-    }
 
-    const handleLogoutWithConfirmation = () => {
-        if (window.confirm("Voulez-vous vraiment vous déconnecter ?")) {
-            handleLogout();
-        }
-    };
+
 
     const storedUser = JSON.parse(localStorage.getItem("gestpr_user"));
     const userRole = storedUser?.role;
     const userNom = storedUser?.nom;
     const userPrenom = storedUser?.prenom;
-
+    
 
     return<>
         <nav className="navbar  px-4" style={{
@@ -41,23 +33,7 @@ function Nav(){
 
             <div className="d-flex align-items-center gap-3">
                 {/* 🏠 LIENS ACCESSIBLES PAR TOUT LE MONDE CONNECTÉ */}
-                {
-                    userRole === "Admin" && <Link className="nav-link" to="/home@admin">Tableau de bord</Link>
-                }
-                {
-                    userRole === "Demandeur" && <Link className="nav-link" to="/home@demandeur">Mes demandes</Link>
-                }
-
-                {/* 🛠️ MENUS VISIBLES UNIQUEMENT PAR L'ADMIN */}
-                {
-                    userRole === "Admin" && (
-                        <>
-                            <Link className="nav-link" to="/utilisateur/ListeUser">Utilisateur</Link>
-                            <Link className="nav-link" to="/fournisseur/ListeFournisseur">Fournisseurs</Link>
-                            <Link className="nav-link" to="/taux/ListeTaux">Gestion des Taux</Link>
-                        </>
-                    )
-                }
+            
 
                 
                 {/* 👤 INFOS UTILISATEUR ET DÉCONNEXION */}

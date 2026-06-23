@@ -49,6 +49,23 @@ namespace GestPR.Controllers
             }
         }
 
+        //REécupérer nombre taux
+        [HttpGet("count")]
+        public async Task<ActionResult<int>> GetTotalCount()
+        {
+            try
+            {
+                int total = await _service.GetTotalTauxCountAsync();
+                return Ok(total);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError,
+                    $"Erreur lors de la récupération du compte : {ex.Message}");
+            }
+
+        }
+
         //// GET api/taux/3/historique
         ///
         [HttpGet("{id}/historique")]

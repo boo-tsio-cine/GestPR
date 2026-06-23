@@ -20,6 +20,9 @@
   /* filter: blur(6px); */
 }
 
+.status{
+    text-transform: uppercase;
+}
 
 .form-demande{
     display: flex;
@@ -27,6 +30,7 @@
     gap:1rem;
     margin-top: 1rem;
     margin-bottom: 1rem;
+    
 }
 
 .input-hover:hover{

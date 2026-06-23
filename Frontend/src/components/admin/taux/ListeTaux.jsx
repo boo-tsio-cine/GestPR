@@ -343,6 +343,8 @@ function UserForm({ onSuccess }){
                 <option value="Kg">Kg</option>
                 <option value="Conteneur">Conteneur</option>
                 <option value="%">%</option>
+                <option value="Ar">Ar</option>
+                <option value="£">£</option>
                 {/* <option value="Validateur">Validateur</option> */}
                 </select>
                 {errors.unite && <p className="text-red-500 text-sm mt-1">{errors.unite}</p>}
@@ -370,9 +372,13 @@ function UserForm({ onSuccess }){
                 name="produit"
                 >
                 <option value="">Sélectionner un rôle</option>
+                <option value="Tous">Tous</option>
+                <option value="Aériens">Aériens</option>
+                <option value="Cannete">Cannetes</option>
+                <option value="Full">Full</option>
+                <option value="Groupage">Groupage</option>
                 <option value="Malte">Malte</option>
                 <option value="Sucre">Sucre</option>
-                <option value="Cannete">Cannetes</option>
                 {/* <option value="Validateur">Validateur</option> */}
                 </select>
                 {errors.produit && <p className="text-red-500 text-sm mt-1">{errors.produit}</p>}

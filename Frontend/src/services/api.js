@@ -48,6 +48,8 @@ export const userService = {
   create: (data) => api.post("/Auth/utilisateurs", data),
   update: (id, data) => api.put(`/Auth/utilisateurs/${id}`, data),
   delete: (id) => api.delete(`/Auth/utilisateurs/${id}`), // Optionnel si vous gérez la suppression
+  count: () => api.get("/Auth/utilisateurs/count/"), 
+  idMatricule : () => api.get(`Auth/by-matricule/${matricule}`)
 };
 
 export const tauxService = {
@@ -55,6 +57,7 @@ export const tauxService = {
   create: (data) => api.post("/taux/", data),
   update: (id, data) => api.put(`/taux/${id}`, data),
   delete: (id) =>api.delete(`/taux/${id}`),
+  count: () => api.get("/taux/count/"),
 };
 
 export const frsService = {
@@ -62,7 +65,7 @@ export const frsService = {
   create: (data) => api.post("/frs/", data),
   delete: (id) =>api.delete(`/frs/${id}`),
   update: (id, data) => api.put(`/frs/${id}`, data),
-
+  count: () => api.get("/frs/count"),
 };
 
 export const origineService = {
@@ -71,7 +74,7 @@ export const origineService = {
   create: (data) => api.post("/origines/", data),
   delete: (id) =>api.delete(`/origines/${id}`),
   update: (id, data) => api.put(`/origines/${id}`, data),
-
+  count: () => api.get("/origines/count")
 };
 
 

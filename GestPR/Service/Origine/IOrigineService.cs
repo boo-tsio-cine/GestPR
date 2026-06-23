@@ -7,6 +7,7 @@ namespace GestPR.Service
         Task<IEnumerable<OrigineResponseDto>> GetAllAsync();
         Task<OrigineResponseDto> GetByIdAsync(int id);
         Task<OrigineResponseDto> CreateAsync(OrigineCreateDto dto);
+        Task<int> GetTotalOrigineCountAsync();
         Task DeleteAsync(int id);
     }
 }

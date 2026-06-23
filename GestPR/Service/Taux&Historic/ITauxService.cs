@@ -10,6 +10,7 @@ namespace GestPR.Service.Taux_Historic
         Task<tauxResponseDto> CreateAsync(tauxCreateDto tauxCreateDto);
         Task<tauxResponseDto> UpdateAsync(int id, tauxUpdateDto tauxUpdateDto);
         Task<IEnumerable<tauxHistoriqueResponseDto>> GetHistoriqueAsync(int idTaux);
+        Task<int> GetTotalTauxCountAsync();
         Task DeleteAsync(int id);
     }
 }

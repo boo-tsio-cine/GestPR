@@ -64,6 +64,11 @@ namespace GestPR.Repository.Taux_Historic
             }
         }
 
+        public async Task<int> GetTotalTauxCountAsync()
+        {
+            return await _context.Taux.CountAsync();
+        }
+
         public async Task DeleteAsync(int id)
         {
             var existingTaux = await _context.Taux.FindAsync(id);

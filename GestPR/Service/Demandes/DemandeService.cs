@@ -85,6 +85,7 @@ namespace GestPR.Service
             Status = d.Status ?? "",
             Motif = d.Motif ?? "",
             DateTime = d.DateTime,
+            DemandeurId = d.DemandeurId,
             Articles = d.Articles.Select(a => new ArticleResponseDto
             {
                 Id = a.Id,

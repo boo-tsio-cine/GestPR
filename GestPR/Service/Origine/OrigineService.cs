@@ -30,7 +30,10 @@ namespace GestPR.Service
             return MapToDto(origine);
         }
 
-
+        public async Task<int> GetTotalOrigineCountAsync()
+        {
+            return await _repo.GetTotalOrigineCountAsync();
+        }
 
         //Créer origine avec validatrion
         public async Task<OrigineResponseDto> CreateAsync(OrigineCreateDto dto)

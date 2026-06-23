@@ -2,39 +2,94 @@ import { Link } from "react-router-dom";
 import { Users } from "lucide-react";
 import "./home.css";
 import Nav from "../nav/nav";
+import { frsService, origineService, tauxService, userService } from "../../services/api";
+import { useEffect, useState } from "react";
 
-const cards = [
+
+
+    
+
+
+function HomeAdmin(){
+
+    const [count, setCount] = useState({
+        utilisateur : 0,
+        fournisseur : 0,
+        origines : 0,
+        taux : 0
+    });
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+
+    const fetchAllCounts = async () => {
+        try 
+        {
+            setLoading(true);
+            setError(null);
+
+            // 🚀 Exécution des 4 requêtes d'API en parallèle
+            const [resUsers, resFournisseurs, resOrigines, resTaux] = await Promise.all([
+                userService.count(),
+                frsService.count(),
+                origineService.count(),
+                tauxService.count()
+            ]);
+
+            setCount({
+                utilisateur : resUsers.data,
+                fournisseurs: resFournisseurs.data,
+                origines: resOrigines.data,
+                taux: resTaux.data
+            });
+        } catch (err) {
+            setError(err.message || "Erreur lors du chargement des statistiques");
+        }finally{
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchAllCounts();
+    }, []);
+
+
+
+
+    const cards = [
     {
         key:"utilisateur",
         title:"utilisateurs",
         url: "/utilisateur/ListeUser",
         icon: Users,
-        nombre : 15
+        nombre : loading ? "..." : count.utilisateur
     },
     {
         key:"fournisseur",
         title:"fournisseur",
         url: "/fournisseur/ListeFournisseur",
         icon: Users,
-        nombre : 90
+        nombre : loading ? "..." : count.fournisseurs
     },
     {
         key:"origine",
         title:"origine",
         url: "/origine/ListeOrigine",
         icon: Users,
-        nombre : 17
+        nombre : loading ? "..." : count.origines
     },
     {
         key:"taux",
         title:"taux",
         url: "/taux/ListeTaux",
         icon: Users,
-        nombre : 18
+        nombre : loading ? "..." : count.taux
     },
 ];
 
-function HomeAdmin(){
+
+
+
     return<>
         <>
             <Nav/>
@@ -47,7 +102,7 @@ function HomeAdmin(){
                     </h1>
                     <p>Vue d'ensemble de l'administration</p>
                 </div>
-                
+                {error && <p className="error-message" style={{ color: 'red' }}>{error}</p>}
                 <div className="grid_db">
                     {
                         cards.map((c)=>{

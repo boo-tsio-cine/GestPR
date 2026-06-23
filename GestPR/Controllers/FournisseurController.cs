@@ -73,6 +73,23 @@ namespace GestPR.Controllers
             return NoContent();
         }
 
+        // 🛠️ AJOUT : RECUPERER LE NOMBRE TOTAL DE FOURNISSEURS
+        // GET: /api/frs/count
+        [HttpGet("count")]
+        public async Task<ActionResult<int>> GetTotalFournisseurCount()
+        {
+            try
+            {
+                // Compte directement en base de données de manière asynchrone
+                int total = await _context.Fournisseur.CountAsync();
+                return Ok(total);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError,
+                    $"Erreur lors de la récupération du compte fournisseur : {ex.Message}");
+            }
+        }
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)

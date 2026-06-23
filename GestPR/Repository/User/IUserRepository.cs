@@ -10,5 +10,6 @@ namespace GestPR.Repository
         Task DeleteAsync(int id);
         Task UpdateAsync(User user);
         Task UpdatePasswordAsync(User user);
+        Task<int> GetTotalUserCountAsync();
     }
 }

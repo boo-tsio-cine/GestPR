@@ -196,6 +196,52 @@ namespace GestPR.Controllers
             }
             return NoContent(); // Code 204 : Suppression réussie sans contenu en retour
         }
+
+        // RECUPERER LE NOMBRE TOTAL D'UTILISATEURS
+        [HttpGet("utilisateurs/count")]
+        public IActionResult GetTotalUtilisateursCount()
+        {
+            try
+            {
+                using (var connection = new SqlConnection(_identityConnectionString))
+                {
+                    // Requête optimisée avec COUNT(*)
+                    string query = "SELECT COUNT(*) FROM ApplicationUsers WHERE ApplicationName = 'GestPR'";
+
+                    using (var command = new SqlCommand(query, connection))
+                    {
+                        connection.Open();
+                        // ExecuteScalar est parfait ici car il ne retourne qu'un seul chiffre numérique
+                        int total = Convert.ToInt32(command.ExecuteScalar());
+
+                        return Ok(total);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError,
+                    $"Erreur lors de la récupération du compte utilisateur : {ex.Message}");
+            }
+        }
+
+
+        [HttpGet("by-matricule/{matricule}")]
+        public async Task<IActionResult> GetByMatricule(string matricule)
+        {
+            // Va chercher l'utilisateur dans la table User via son AdUsername ou son Matricule
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.AdUsername == matricule);
+
+            if (user == null) 
+            {
+                return NotFound(new
+                {
+                    message = $"Utilisateur avec le matricule { matricule } introuvable en base."
+                });
+            }
+            return Ok(user);
+        }
     }
 
 

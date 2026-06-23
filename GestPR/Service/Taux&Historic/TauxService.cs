@@ -107,7 +107,10 @@ namespace GestPR.Service.Taux_Historic
             return MapToDto(taux);
         }
 
-
+        public async Task<int> GetTotalTauxCountAsync()
+        {
+            return await _tauxRepository.GetTotalTauxCountAsync();
+        }
 
 
         private static void Valider(tauxCreateDto tauxCreateDto)
@@ -115,6 +118,7 @@ namespace GestPR.Service.Taux_Historic
             if (string.IsNullOrWhiteSpace(tauxCreateDto.Nom))
                 throw new ArgumentException("Le nom est obligatoire");
         }
+
 
     
         //✅ MapToDto manquait aussi

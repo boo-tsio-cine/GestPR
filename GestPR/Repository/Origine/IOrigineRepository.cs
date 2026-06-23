@@ -8,5 +8,6 @@ namespace GestPR.Repository
         Task<Origine?> GetByIdAsync(int id);
         Task<Origine> CreateAsync(Origine origine);
         Task DeleteAsync(int id);
+        Task <int> GetTotalOrigineCountAsync();
     }
 }

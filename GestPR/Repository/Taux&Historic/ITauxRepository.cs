@@ -8,6 +8,7 @@ namespace GestPR.Repository.Taux_Historic
         Task<Taux?> GetTauxByIdAsync(int id);
         Task<Taux?> CreateAsync(Taux taux);
         Task<Taux> UpdateAvecHistoriqueAsync(Taux taux, TauxHistorique historique);
+        Task<int> GetTotalTauxCountAsync();
 
         Task DeleteAsync(int id);
         

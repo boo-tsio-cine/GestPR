@@ -23,6 +23,23 @@ namespace GestPR.Controllers
             return Ok(origines);
         }
 
+        //REécupérer nombre taux
+        [HttpGet("count")]
+        public async Task<ActionResult<int>> GetTotalOrigineCountAsync()
+        {
+            try
+            {
+                int total = await _service.GetTotalOrigineCountAsync();
+                return Ok(total);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError,
+                    $"Erreur lors de la récupération du compte : {ex.Message}");
+            }
+
+        }
+
         // GET api/origines/3
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
