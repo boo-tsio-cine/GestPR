@@ -24,6 +24,14 @@ namespace GestPR.Repository.Demandes
                 .ToListAsync();
         }
 
+        public async Task<IEnumerable<Demande>> GetAllAsync()
+        {
+            return await _context.Demande
+                .Include(d => d.Articles)
+                .OrderByDescending (d => d.DateTime)
+                .ToListAsync();
+        }
+
         // Récupère une demande par Id
         public async Task<Demande?> GetByIdAsync(int id)
         {

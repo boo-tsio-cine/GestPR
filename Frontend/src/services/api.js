@@ -92,7 +92,9 @@ export const authService = {
 export const demandeService = {
   getAll:  (idDemandeur) => api.get(`/demandes?idDemandeur=${idDemandeur}`),
   create:  (data)        => api.post("/demandes", data),
-};
+  get: () =>  api.get("/demandes/all"),
+  getDemande : (idDemande) => api.get(`/demandes/${idDemande}`),
+ };
 
 export const articleService = {
   createBulk: (articles) => api.post("/articles/bulk", articles),

@@ -1,0 +1,10 @@
+.traiter-title{
+    text-align: center;
+}
+
+.traiter-page{
+    margin-top: 1rem;
+    border: 1px rgb(112, 112, 112) solid;
+    border-radius: 2rem;
+    padding: 2rem;
+}

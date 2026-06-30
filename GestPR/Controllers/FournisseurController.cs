@@ -79,7 +79,7 @@ namespace GestPR.Controllers
         public async Task<ActionResult<int>> GetTotalFournisseurCount()
         {
             try
-            {
+            { 
                 // Compte directement en base de données de manière asynchrone
                 int total = await _context.Fournisseur.CountAsync();
                 return Ok(total);

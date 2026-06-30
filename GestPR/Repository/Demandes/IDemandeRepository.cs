@@ -6,6 +6,7 @@ namespace GestPR.Repository.Demandes
     {
         Task<IEnumerable<Demande>> GetByUserAsync(int DemandeurId);
         Task<Demande?> GetByIdAsync(int id);
+        Task<IEnumerable<Demande>>GetAllAsync();
         Task<Demande> CreateAvecArticleAsync(
                 Demande demande, List<Article> articles
             );

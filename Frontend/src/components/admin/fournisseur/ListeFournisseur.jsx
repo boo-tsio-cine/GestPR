@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 
 import DialogPage from "../../../page/dialog_page";
 import { Button } from "../../ui/button";

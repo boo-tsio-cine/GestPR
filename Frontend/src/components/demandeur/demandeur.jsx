@@ -386,6 +386,8 @@ function DemandesTable({ data, onDetail, empty }) {
     if (data.length === 0) {
         return <p className="py-6 text-center text-sm text-muted-foreground">{empty}</p>;
     }
+
+    
     return (
         <div className="w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
             <Table className="table">
@@ -414,7 +416,7 @@ function DemandesTable({ data, onDetail, empty }) {
                                 
                             }}>
                                 {d.status}
-                            </TableCell>
+                            </TableCell>0
                             <TableCell className="px-4 py-3 text-right">
                                 <Button size="sm" variant="outline" className="gap-1 btn_detail" onClick={() => onDetail(d)}>
                                     <Eye className="h-4 w-4" /> Détail

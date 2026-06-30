@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "../../ui/button";
 import DialogPage from "../../../page/dialog_page";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import CrudPage from "../../../page/crud_page";
 import { tauxService} from "../../../services/api";
 import Nav from "../../nav/nav";

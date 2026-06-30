@@ -13,6 +13,8 @@ import HistoriqueTaux from "./components/admin/taux/HistoriqueTaux";
 import Demandeur from "./components/demandeur/demandeur";
 import Welcome from "./components/Welcome";
 import ListeUser from "./components/admin/utilisateur/ListeUser"; 
+import Comptabilite from "./components/comptabilite/comptabilite";
+import { TraitementDemande } from "./components/comptabilite/traitement/traitementDemande";
 
 function App() {
   const { user, login} = useAuth();
@@ -77,8 +79,8 @@ function App() {
 
       {/* 🔒 ACCÈS VALIDATEUR ET COMPTABILITÉ (Ajoutez vos composants ici plus tard) */}
       <Route path="/home@validateur" element={<ProtectedRoute roles={["Validateur"]}><div className="p-4">Espace Validateur</div></ProtectedRoute>} />
-      <Route path="/home@comptabilite" element={<ProtectedRoute roles={["Comptabilite"]}><div className="p-4">Espace Comptabilité</div></ProtectedRoute>} />
-
+      <Route path="/home@comptabilite" element={<ProtectedRoute roles={["Comptabilité"]}><Comptabilite/></ProtectedRoute>} />
+      <Route path="/traiter-demande/:id"  element={<ProtectedRoute roles={["Comptabilité"]}><TraitementDemande/></ProtectedRoute>} />
       {/* Si l'URL n'est pas reconnue ou qu'il y a un problème, retour à l'accueil de bienvenue */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

@@ -6,6 +6,7 @@ namespace GestPR.Service.Demandes
     {
         Task <IEnumerable<DemandeAvecArticleResponseDto>> GetByUserAsync(int DemandeurId);
         Task <DemandeAvecArticleResponseDto> GetByIdAsync(int id);
+        Task<IEnumerable<DemandeAvecArticleResponseDto>> GetAllAsync();
         Task<DemandeAvecArticleResponseDto> CreateAvecArticlesAsync(DemandeAvecArticleCreateDto dto);
     }
 }

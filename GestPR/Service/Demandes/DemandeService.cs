@@ -18,12 +18,20 @@ namespace GestPR.Service
             _repo = repo;
         }
 
+       
+
         // Récupère les demandes d'un utilisateur
         public async Task<IEnumerable<DemandeAvecArticleResponseDto>> GetByUserAsync(
             int DemandeurId)
         {
             var demandes = await _repo.GetByUserAsync(DemandeurId);
             return demandes.Select(MapToDto);
+        }
+
+        public async Task<IEnumerable<DemandeAvecArticleResponseDto>> GetAllAsync()
+        {
+            var returnDemande = await _repo.GetAllAsync();
+            return returnDemande.Select(MapToDto);
         }
 
         // Récupère une demande par Id

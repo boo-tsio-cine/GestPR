@@ -2,7 +2,7 @@
 
 import CrudPage from "../../../page/crud_page";
 import { useEffect, useState } from "react";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import { tauxHistoriqueService } from "../../../services/api";
 import Nav from "../../nav/nav";
 

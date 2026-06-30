@@ -40,6 +40,14 @@ namespace GestPR.Controllers
             }
         }
 
+        //Get all demande
+        [HttpGet("all")]
+        public async Task<IActionResult> GetAllAsync()
+        {
+            var returndemandes = await _service.GetAllAsync();
+            return Ok(returndemandes);
+        }
+
         // POST api/demandes
         [HttpPost]
         public async Task<IActionResult> Create(
