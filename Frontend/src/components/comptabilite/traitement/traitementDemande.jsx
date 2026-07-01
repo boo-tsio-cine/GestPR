@@ -15,7 +15,18 @@ function emptyDossierData(){
         fobTotal : "" ,
         mfobTotal: "", 
         fretTotal : "" , 
-        fraisApprocheTotal : "",
+        
+        deboursTransit : "",
+        remunerationTransit : "",
+        deboursMagasinage : "",
+        transportLocal : "",
+        commissionRemun : "",
+        commissionBancaires : "",
+        douanes : "",
+        prestationGasyNet : "",
+        apmf: "",
+        controleRadioactive: "",
+        autresDat: "",
     };
 }
 
@@ -25,6 +36,12 @@ function emptyArticleSaisie(){
         quantite : "",
     };
 }
+
+
+function calculeFraisApprocheTotal(dossierData){
+    fraisApprocheTotal = 0;
+}
+
 
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -198,6 +215,21 @@ export function TraitementDemande(){
     // if (loading) return <div className="container mt-5">Chargement de la demande...</div>;s
 
 
+    // CalculefraisApprocheTotal = () => {
+    const fraisApprocheTotalCalcule = useMemo(() => {
+        const clesFrais = ["deboursTransit", "remunerationTransit", "deboursMagasinage", "transportLocal", "commissionRemun", "commissionBancaires", "douanes", "prestationGasyNet", "apmf", "controleRadioactive", "autresDat"
+        ];
+        
+        const maritimeFret = parseFloat(dossierData.fretTotal * dossierData.cours) || 0;
+        const maritimeMfob = parseFloat(dossierData.mfobTotal * dossierData.cours) || 0;
+        const totalAutresFrais = clesFrais.reduce((total, cle) => {
+            const valeur = parseFloat(dossierData[cle]) || 0;
+            return total + valeur;
+        }, 0);
+        
+        return maritimeFret + maritimeMfob + totalAutresFrais;
+    }, [dossierData]);
+
     // ── Calculs dérivés (recalculés à chaque changement) ────────────────
  
   const montantTotalDossier = useMemo(() => {
@@ -206,12 +238,18 @@ export function TraitementDemande(){
     return calcMontantTotalDossier(lots);
   }, [demandes, saisies]);
  
+
+  const coutetfret = dossierData.coutTotalAr + dossierData.mfobTotal + dossierData.fretTotal;
+  const assurance = (coutetfret * taux_assurance) / 100;
+  const valeurCAF = coutetfret + assurance;
+
+
   const resultatsParArticle = useMemo(() => {
     if (!demandes) return {};
     const resultats = {};
     demandes.lots.forEach((lot) => {
       const saisie = saisies[lot.id] || emptyArticleSaisie();
-      resultats[lot.id] = calculerArticle(saisie, dossierData, montantTotalDossier);
+      resultats[lot.id] = calculerArticle(saisie, {...dossierData, fraisApprocheTotal: fraisApprocheTotalCalcule}, montantTotalDossier);
     });
     return resultats;
   }, [demandes, saisies, dossierData, montantTotalDossier]);
@@ -227,6 +265,8 @@ export function TraitementDemande(){
     };
   }, [resultatsParArticle]);
  
+  const totalAr = valeurCAF + fraisApprocheTotalCalcule;
+
   // ── Soumission ───────────────────────────────────────────────────────
  
   const handleSubmit = async (e) => {
@@ -265,7 +305,7 @@ export function TraitementDemande(){
         fobTotal: parseFloat(dossierData.fobTotal),
         mfobTotal: parseFloat(dossierData.mfobTotal),
         fretTotal: parseFloat(dossierData.fretTotal),
-        fraisApprocheTotal: parseFloat(dossierData.fraisApprocheTotal),
+        fraisApprocheTotal: fraisApprocheTotalCalcule,
         articles,
       });
  
@@ -412,13 +452,64 @@ const STYLE_PAR_DEFAUT = { backgroundColor: "#F3F4F6", color: "#374151", borderC
                                     type="number"
                                     step="0.01"
                                     className="form-control"
-                                    value={dossierData.fraisApprocheTotal}
-                                    onChange={(e) => updateDossierField("fraisApprocheTotal", e.target.value)}
-                                    required
+                                    value={fraisApprocheTotalCalcule}
+                                    readOnly
                                     />
                             </div>
                         </div>
                     </div>
+
+                    {/* ── Détail des frais d'approche ─────────────────────────────── */}
+                    <div className="card mt-3 p-4">
+                        <h4>Détail des frais d'approche (Ariary)</h4>
+                        <div className="row g-3">
+                            <div className="col-md-4">
+                                <label className="form-label">Débours Transit</label>
+                                <input type="number" step="0.01" className="form-control" value={dossierData.deboursTransit} onChange={(e) => updateDossierField("deboursTransit", e.target.value)} />
+                            </div>
+                            <div className="col-md-4">
+                                <label className="form-label">Rémunération Transit</label>
+                                <input type="number" step="0.01" className="form-control" value={dossierData.remunerationTransit} onChange={(e) => updateDossierField("remunerationTransit", e.target.value)} />
+                            </div>
+                            <div className="col-md-4">
+                                <label className="form-label">Débours Magasinage</label>
+                                <input type="number" step="0.01" className="form-control" value={dossierData.deboursMagasinage} onChange={(e) => updateDossierField("deboursMagasinage", e.target.value)} />
+                            </div>
+                            <div className="col-md-4">
+                                <label className="form-label">Transport Local</label>
+                                <input type="number" step="0.01" className="form-control" value={dossierData.transportLocal} onChange={(e) => updateDossierField("transportLocal", e.target.value)} />
+                            </div>
+                            <div className="col-md-4">
+                                <label className="form-label">Commission Rémun</label>
+                                <input type="number" step="0.01" className="form-control" value={dossierData.commissionRemun} onChange={(e) => updateDossierField("commissionRemun", e.target.value)} />
+                            </div>
+                            <div className="col-md-4">
+                                <label className="form-label">Commission Bancaires</label>
+                                <input type="number" step="0.01" className="form-control" value={dossierData.commissionBancaires} onChange={(e) => updateDossierField("commissionBancaires", e.target.value)} />
+                            </div>
+                            <div className="col-md-4">
+                                <label className="form-label">Douanes</label>
+                                <input type="number" step="0.01" className="form-control" value={dossierData.douanes} onChange={(e) => updateDossierField("douanes", e.target.value)} />
+                            </div>
+                            <div className="col-md-4">
+                                <label className="form-label">Prestation GasyNet</label>
+                                <input type="number" step="0.01" className="form-control" value={dossierData.prestationGasyNet} onChange={(e) => updateDossierField("prestationGasyNet", e.target.value)} />
+                            </div>
+                            <div className="col-md-4">
+                                <label className="form-label">APMF</label>
+                                <input type="number" step="0.01" className="form-control" value={dossierData.apmf} onChange={(e) => updateDossierField("apmf", e.target.value)} />
+                            </div>
+                            <div className="col-md-4">
+                                <label className="form-label">Contrôle Radioactive</label>
+                                <input type="number" step="0.01" className="form-control" value={dossierData.controleRadioactive} onChange={(e) => updateDossierField("controleRadioactive", e.target.value)} />
+                            </div>
+                            <div className="col-md-4">
+                                <label className="form-label">Autres DAT</label>
+                                <input type="number" step="0.01" className="form-control" value={dossierData.autresDat} onChange={(e) => updateDossierField("autresDat", e.target.value)} />
+                            </div>
+                        </div>
+                    </div>
+
                      {/* ── Tableau articles avec calculs automatiques ──────────── */}
                     <div className="card mt-3 p-4">
                         
