@@ -12,5 +12,7 @@ namespace GestPR.Repository.Demandes
             );
 
         Task<bool> UserExistsAsync(int userId);
+
+        Task SaveChangesAsync();
     }
 }

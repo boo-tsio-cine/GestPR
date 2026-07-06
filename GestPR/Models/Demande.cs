@@ -13,6 +13,9 @@ namespace GestPR.Models
         [MaxLength(100)]
         public string Motif { get; set; } = "En attente" ;
 
+        [MaxLength(255)]
+        public string? PdfFileName { get; set; }
+
         [Required]
         public DateTime DateTime { get; set; } = DateTime.UtcNow;
 

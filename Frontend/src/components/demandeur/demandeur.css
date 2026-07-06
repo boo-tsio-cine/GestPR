@@ -133,3 +133,30 @@ main{
 [TableRow]{
     background:blue ;
 }
+
+/* 1. L'état initial de l'icône */
+.eyehover {
+  transition: transform 0.3s ease, color 0.3s ease;
+}
+
+/* 2. Effet au survol du BOUTON (pour que l'animation se déclenche dès qu'on frôle le bouton) */
+button:hover .eyehover {
+  /* Petit effet de zoom sympa pour donner de la vie */
+  transform: scale(1.15); 
+  /* Déclenchement de l'animation de couleur alternée */
+  animation: eyeColorShift 2s infinite linear;
+}
+
+/* 3. La timeline de l'animation de couleur (Vert -> Rouge -> Blanc) */
+@keyframes eyeColorShift {
+  0% {
+    color: #28a745; /* Vert (Bootstrap success) */
+  }
+  50% {
+    color: #dc3545; /* Rouge (Bootstrap danger) */
+  }
+ 
+  100% {
+    color: #28a745; /* Retour au Vert pour une boucle parfaite sans coupure */
+  }
+}

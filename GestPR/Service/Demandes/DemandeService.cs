@@ -2,10 +2,14 @@
 using GestPR.Dtos;
 using GestPR.Models;
 using GestPR.Repository;
-
+using Microsoft.AspNetCore.Http;
 using GestPR.Repository.Demandes;
-
 using GestPR.Service.Demandes;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace GestPR.Service
 {
@@ -18,11 +22,8 @@ namespace GestPR.Service
             _repo = repo;
         }
 
-       
-
         // Récupère les demandes d'un utilisateur
-        public async Task<IEnumerable<DemandeAvecArticleResponseDto>> GetByUserAsync(
-            int DemandeurId)
+        public async Task<IEnumerable<DemandeAvecArticleResponseDto>> GetByUserAsync(int DemandeurId)
         {
             var demandes = await _repo.GetByUserAsync(DemandeurId);
             return demandes.Select(MapToDto);
@@ -43,18 +44,14 @@ namespace GestPR.Service
         }
 
         // Crée une demande avec ses articles
-        public async Task<DemandeAvecArticleResponseDto> CreateAvecArticlesAsync(
-            DemandeAvecArticleCreateDto dto)
+        public async Task<DemandeAvecArticleResponseDto> CreateAvecArticlesAsync(DemandeAvecArticleCreateDto dto)
         {
-
             if (!await _repo.UserExistsAsync(dto.DemandeurId))
                 throw new ArgumentException($"Utilisateur {dto.DemandeurId} introuvable");
 
-
             // 1. Validation
             if (dto.Articles == null || dto.Articles.Count == 0)
-                throw new ArgumentException(
-                    "La demande doit contenir au moins un article");
+                throw new ArgumentException("La demande doit contenir au moins un article");
 
             foreach (var a in dto.Articles)
             {
@@ -86,6 +83,53 @@ namespace GestPR.Service
             return MapToDto(created);
         }
 
+        // 💡 UN SEUL BLOC : Reçoit le fichier, génère le GUID unique et l'enregistre sur le disque dur
+        public async Task<bool> SoumettreDemandeAsync(int id, IFormFile pdfFile)
+        {
+            var demande = await _repo.GetByIdAsync(id);
+            if (demande == null) return false;
+
+            if (pdfFile != null && pdfFile.Length > 0)
+            {
+                var dossierStockage = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "pdfs");
+                if (!Directory.Exists(dossierStockage))
+                {
+                    Directory.CreateDirectory(dossierStockage);
+                }
+
+                var extension = Path.GetExtension(pdfFile.FileName);
+                var nomUniqueFichier = $"{Guid.NewGuid()}{extension}";
+                var cheminComplet = Path.Combine(dossierStockage, nomUniqueFichier);
+
+                using (var stream = new FileStream(cheminComplet, FileMode.Create))
+                {
+                    await pdfFile.CopyToAsync(stream);
+                }
+
+                demande.PdfFileName = nomUniqueFichier;
+            }
+
+            demande.Status = "En cours";
+            await _repo.SaveChangesAsync();
+            return true;
+        }
+
+        // 💡 Prise de décision finale + modification du motif
+        public async Task<bool> UpdateStatusAsync(int id, string nouveauStatut, string motifDecision)
+        {
+            var demande = await _repo.GetByIdAsync(id);
+            if (demande == null) return false;
+
+            demande.Status = nouveauStatut;
+            if (!string.IsNullOrWhiteSpace(motifDecision))
+            {
+                demande.Motif = motifDecision; // Met à jour le motif avec la raison du validateur
+            }
+
+            await _repo.SaveChangesAsync();
+            return true;
+        }
+
         // Conversion Model → DTO
         private static DemandeAvecArticleResponseDto MapToDto(Demande d) => new()
         {
@@ -94,6 +138,7 @@ namespace GestPR.Service
             Motif = d.Motif ?? "",
             DateTime = d.DateTime,
             DemandeurId = d.DemandeurId,
+            PdfFileName = d.PdfFileName,
             Articles = d.Articles.Select(a => new ArticleResponseDto
             {
                 Id = a.Id,

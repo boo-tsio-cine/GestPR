@@ -1,0 +1,167 @@
+.pdf-preview-background { 
+    background-color: #525659; 
+    min-height: 100vh; 
+    padding: 10px 0; 
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; 
+}
+
+.action-bar { 
+    background-color: #212529; 
+    padding: 10px 20px; 
+    position: fixed; 
+    top: 0; 
+    left: 0; 
+    right: 0; 
+    z-index: 9999; 
+    display: flex; 
+    align-items: center; 
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3); 
+}
+
+.text-sm { 
+    font-size: 13px; 
+}
+
+/* Layout Format Papier A4 Standard */
+.page-a4 { 
+    background: #ffffff; 
+    width: 210mm; 
+    min-height: 297mm; 
+    padding: 20mm; 
+    margin: 10px auto 0 auto; 
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.4); 
+    position: relative; 
+    box-sizing: border-box; 
+    color: #333333; 
+}
+
+/* Badges de Statut Flottants */
+.statut-badge { 
+    position: absolute; 
+    top: 20mm; 
+    right: 20mm; 
+    padding: 6px 16px; 
+    font-size: 14px; 
+    font-weight: bold; 
+    border-radius: 3px; 
+    text-transform: uppercase; 
+    letter-spacing: 0.5px; 
+}
+
+.statut-en_cours { background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+.statut-validé { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+.statut-refusé { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+
+.pdf-header { 
+    border-bottom: 2px solid #333; 
+    padding-bottom: 5px; 
+    margin-bottom: 20px; 
+}
+
+.pdf-header h3 { margin: 0; font-size: 16px; font-weight: bold; color: #111; }
+.pdf-header .sub-text { margin: 2px 0 0 0; font-size: 11px; color: #666; }
+
+.pdf-title-block { 
+    text-align: center; 
+    margin-bottom: 25px; 
+}
+
+.pdf-title-block h4 { margin: 0; font-size: 18px; font-weight: bold; text-decoration: underline; }
+.ref-text { font-size: 12px; display: inline-block; margin-top: 5px; }
+
+.section-title { 
+    font-size: 13px; 
+    font-weight: bold; 
+    background-color: #f0f0f0; 
+    padding: 4px 8px; 
+    border-left: 4px solid #0056b3; 
+    margin-top: 15px; 
+    margin-bottom: 10px; 
+    text-transform: uppercase; 
+}
+
+/* Structures de Tableaux Épurées Style Document Officiel */
+.table-pdf { 
+    width: 100%; 
+    border-collapse: collapse; 
+    font-size: 12px; 
+    margin-bottom: 10px; 
+}
+
+.table-pdf td { padding: 6px; border: 1px solid #ddd; }
+.leaf-bold { font-weight: bold; background-color: #fafafa; }
+.table-row-highlight { background-color: #e9ecef; }
+
+/* Grille pour la liste de la photo */
+.grid-frais { 
+    display: grid; 
+    grid-template-columns: repeat(2, 1fr); 
+    gap: 6px; 
+    font-size: 11px; 
+}
+
+.frais-item { 
+    display: flex; 
+    justify-content: space-between; 
+    padding: 4px 8px; 
+    border-bottom: 1px dashed #ccc; 
+}
+
+.frais-item .label { color: #555; }
+.frais-item .val { font-weight: 500; }
+
+.total-frais-box { 
+    display: flex; 
+    justify-content: space-between; 
+    background-color: #343a40; 
+    color: #fff; 
+    padding: 8px 12px; 
+    font-size: 13px; 
+    border-radius: 2px; 
+}
+
+.table-articles { 
+    width: 100%; 
+    border-collapse: collapse; 
+    font-size: 12px; 
+    margin-top: 10px; 
+}
+
+.table-articles th { background-color: #343a40; color: white; padding: 8px; font-weight: 600; text-align: left; }
+.table-articles td { padding: 8px; border-bottom: 1px solid #eee; }
+.table-articles tbody tr:nth-child(even) { background-color: #f9f9f9; }
+
+.font-monospace-bold { font-weight: bold; font-family: monospace; font-size: 13px; }
+.text-end { text-align: right; }
+
+.signature-section { 
+    margin-top: 50px; 
+    display: flex; 
+    justify-content: space-between; 
+    padding: 0 20px; 
+}
+
+.sign-box { width: 200px; text-align: center; font-size: 12px; font-weight: bold; }
+.line-signature { margin-top: 45px; border-bottom: 1px solid #333; }
+.sign-statut-text { font-size: 10px; color: #28a745; font-style: italic; display: block; margin-top: 5px; }
+
+/* Règle CSS pour le bouton de téléchargement pour éviter d'imprimer la barre d'outils */
+@media print {
+    .no-print { display: none !important; }
+    body { background: none; }
+    .pdf-preview-background { padding: 0; background: none; }
+    .page-a4 { box-shadow: none; margin: 0; padding: 0; width: 100%; }
+}
+
+
+.image{
+    width: 10rem;
+    height: 3.5rem;
+    overflow: hidden;
+}
+
+.image img{
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}

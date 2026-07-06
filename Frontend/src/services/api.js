@@ -94,7 +94,14 @@ export const demandeService = {
   create:  (data)        => api.post("/demandes", data),
   get: () =>  api.get("/demandes/all"),
   getDemande : (idDemande) => api.get(`/demandes/${idDemande}`),
- };
+
+  soumettreTraitement : (id, formData) => api.post(`/demandes/${id}/soumettre`, formData, {
+      headers: {
+          "Content-Type": "multipart/form-data"
+      }
+  }),
+  updateStatus : (id, status, motif) => api.put(`/demandes/${id}/status`, { status, motif }),
+  };
 
 export const articleService = {
   createBulk: (articles) => api.post("/articles/bulk", articles),

@@ -28,7 +28,7 @@ namespace GestPR.Repository.Demandes
         {
             return await _context.Demande
                 .Include(d => d.Articles)
-                .OrderByDescending (d => d.DateTime)
+                .OrderByDescending(d => d.DateTime)
                 .ToListAsync();
         }
 
@@ -52,13 +52,13 @@ namespace GestPR.Repository.Demandes
                 // 2. Ajouter les articles liés à la demande
                 foreach (var article in articles)
                 {
-                    article.DemandeId= demande.Id; // Lier l'article à la demande
+                    article.DemandeId = demande.Id; // Lier l'article à la demande
                     _context.Article.Add(article);
                 }
                 await _context.SaveChangesAsync();
                 // 3. Commit la transaction
                 await transaction.CommitAsync();
-                return demande; 
+                return demande;
             }
             catch
             {
@@ -73,6 +73,11 @@ namespace GestPR.Repository.Demandes
             return await _context.Users.AnyAsync(u => u.Id == userId);
 
 
+        }
+
+        public async Task SaveChangesAsync()
+        {
+            await _context.SaveChangesAsync();
         }
     }
 }

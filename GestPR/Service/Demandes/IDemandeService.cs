@@ -1,4 +1,8 @@
 ﻿using GestPR.Dtos;
+using Microsoft.AspNetCore.Http;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
 
 namespace GestPR.Service.Demandes
 {
@@ -8,5 +12,9 @@ namespace GestPR.Service.Demandes
         Task <DemandeAvecArticleResponseDto> GetByIdAsync(int id);
         Task<IEnumerable<DemandeAvecArticleResponseDto>> GetAllAsync();
         Task<DemandeAvecArticleResponseDto> CreateAvecArticlesAsync(DemandeAvecArticleCreateDto dto);
+
+        Task<bool>SoumettreDemandeAsync(int id, IFormFile pdfFile);
+
+        Task<bool> UpdateStatusAsync(int id, string nouveauStatut , string motifDecision);
     }
 }

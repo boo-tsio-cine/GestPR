@@ -264,10 +264,11 @@ function DemandesTable({ data, empty }) {
                             </div>
                         </div>
                         <div className="card-link">
-                            <Link className="btn btn-success text-white" to={`/traiter-demande/${d.id}`} style={{ display:'inline-block', textDecoration:'none'}}>
-                                Traiter la demande
-                            </Link>
-                           
+                            {d.status === "Nouvelle" && (
+                                <Link className="btn btn-success text-white" to={`/traiter-demande/${d.id}`} style={{ display:'inline-block', textDecoration:'none'}}>
+                                    Traiter la demande
+                                </Link>
+                            )}
                         </div>
                     </div>
                 </div>

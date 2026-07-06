@@ -1,17 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom"
-import { demandeService } from "../../../services/api";
+import { demandeService, frsService, origineService } from "../../../services/api";
 import { toast } from "sonner";
 import Nav from "../../nav/nav";
 import "./traitement.css";
-
-
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import PageApercuDemande from "./PageApercuDemande";
 
 const taux_assurance = 0.2 ;
 
 function emptyDossierData(){
     return{
+        typeDossier: "" ,
+        tc : "",
         cours: "" ,
+        fournisseur: "",
+        origine:"",
+        port:"",
+        usine:"",
         fobTotal : "" ,
         mfobTotal: "", 
         fretTotal : "" , 
@@ -25,6 +32,7 @@ function emptyDossierData(){
         douanes : "",
         prestationGasyNet : "",
         apmf: "",
+        ddp:"",
         controleRadioactive: "",
         autresDat: "",
     };
@@ -34,13 +42,10 @@ function emptyArticleSaisie(){
     return {
         prixUnitaire:"",
         quantite : "",
+        immo: "",
     };
 }
 
-
-function calculeFraisApprocheTotal(dossierData){
-    fraisApprocheTotal = 0;
-}
 
 
 
@@ -54,6 +59,8 @@ function calcMontant(prixUnitaire, quantite) {
     const qte = parseFloat(quantite) || 0;
     return pu * qte;
 }
+
+
 
 // Total des montants de tous les articles du dossier
 function calcMontantTotalDossier(lots) {
@@ -75,53 +82,7 @@ function calcPartProrata(montantGlobal, proportion) {
   return (total * proportion) / 100;
 }
  
-// Calcule toutes les valeurs dérivées pour un article donné
-function calculerArticle(lot, dossierData, montantTotalDossier) {
-  const montant = calcMontant(lot.prixUnitaire, lot.quantite);
-  const proportion = calcProportion(montant, montantTotalDossier);
- 
-  const partCout = calcPartProrata(dossierData.fobTotal, proportion);
-  const partMfob = calcPartProrata(dossierData.mfobTotal, proportion);
-  const partFret = calcPartProrata(dossierData.fretTotal, proportion);
- 
-  // Coût et Fret (CFR) de l'article
-  const cfr = partCout + partMfob + partFret;
- 
-  // Assurance 0,2% sur le CFR de l'article
-  const assurance = (cfr * taux_assurance) / 100;
- 
-  // Part des frais d'approche du dossier (déjà en Ariary)
-  const partFraisApproche = calcPartProrata(
-    dossierData.fraisApprocheTotal,
-    proportion
-  );
- 
-  // Valeur CAF de l'article (devise)
-  const valeurCaf = cfr + assurance;
- 
-  const cours = parseFloat(dossierData.cours) || 0;
-  const quantite = parseFloat(lot.quantite) || 0;
- 
-  // Coût total de l'article en Ariary = (CAF en devise x cours) + frais d'approche (déjà en Ar)
-  const coutTotalAr = valeurCaf * cours + partFraisApproche;
- 
-  // Prix Unitaire en Ariary
-  const puAriary = quantite > 0 ? coutTotalAr / quantite : 0;
- 
-  return {
-    montant,
-    proportion,
-    partCout,
-    partMfob,
-    partFret,
-    cfr,
-    assurance,
-    partFraisApproche,
-    valeurCaf,
-    coutTotalAr,
-    puAriary,
-  };
-}
+
  
 // ─────────────────────────────────────────────────────────────────────────
 // Formatage d'affichage
@@ -149,7 +110,16 @@ export function TraitementDemande(){
     const [saisies, setSaisies] = useState({});
 
     const [submitting, setSubmitting] = useState(false);
+
+
+    const [afficherApercu, setAfficherApercu] = useState(false);
+    const [idDemandeGenere, setIdDemandeGenere] = useState(null);
     
+    const [error, setError] = useState(null); 
+
+    const [origine, setOrigine] = useState([]);   
+    const [frs, setFrs] = useState([]);   
+
     const fetchDemandes = async () => {
 
         setLoading(true);
@@ -217,7 +187,7 @@ export function TraitementDemande(){
 
     // CalculefraisApprocheTotal = () => {
     const fraisApprocheTotalCalcule = useMemo(() => {
-        const clesFrais = ["deboursTransit", "remunerationTransit", "deboursMagasinage", "transportLocal", "commissionRemun", "commissionBancaires", "douanes", "prestationGasyNet", "apmf", "controleRadioactive", "autresDat"
+        const clesFrais = ["deboursTransit", "remunerationTransit", "deboursMagasinage", "transportLocal", "commissionRemun", "commissionBancaires", "douanes", "prestationGasyNet", "apmf","ddp", "controleRadioactive", "autresDat"
         ];
         
         const maritimeFret = parseFloat(dossierData.fretTotal * dossierData.cours) || 0;
@@ -239,85 +209,284 @@ export function TraitementDemande(){
   }, [demandes, saisies]);
  
 
-  const coutetfret = dossierData.coutTotalAr + dossierData.mfobTotal + dossierData.fretTotal;
-  const assurance = (coutetfret * taux_assurance) / 100;
-  const valeurCAF = coutetfret + assurance;
+  const valeurCAF = useMemo(() => {
+    const fob = parseFloat(dossierData.fobTotal) || 0;
+    const mfob = parseFloat(dossierData.mfobTotal) || 0;
+    const fret = parseFloat(dossierData.fretTotal) || 0;
+    const assurance = ((fob + mfob + fret) * taux_assurance) / 100;
+    const valcaf = fob + mfob + fret + assurance;
+    return valcaf * (parseFloat(dossierData.cours) || 0);
+  }, [dossierData.fobTotal, dossierData.mfobTotal, dossierData.fretTotal]);
 
+  const total = useMemo(() => {
+    const mfob = parseFloat(dossierData.mfobTotal) || 0;
+    const fret = parseFloat(dossierData.fretTotal) || 0;
+    return valeurCAF + fraisApprocheTotalCalcule - ((mfob + fret) * (parseFloat(dossierData.cours) || 0));
+  }, [valeurCAF, fraisApprocheTotalCalcule, dossierData.mfobTotal, dossierData.fretTotal]);
 
   const resultatsParArticle = useMemo(() => {
     if (!demandes) return {};
     const resultats = {};
+
+    //1. D'abord, on calcule le totalPu de TOUS les articles saisis
+    const totalPuSaisi = demandes.lots.reduce((sum, lot) => {
+      const saisie = saisies[lot.id] || emptyArticleSaisie();
+      return sum + (parseFloat(saisie.prixUnitaire) || 0);
+    }, 0);
+
     demandes.lots.forEach((lot) => {
       const saisie = saisies[lot.id] || emptyArticleSaisie();
-      resultats[lot.id] = calculerArticle(saisie, {...dossierData, fraisApprocheTotal: fraisApprocheTotalCalcule}, montantTotalDossier);
+      
+      const base = calculerArticle(
+        { ...lot, prixUnitaire: saisie.prixUnitaire, quantite: saisie.quantite },
+        { ...dossierData, fraisApprocheTotal: fraisApprocheTotalCalcule },
+        montantTotalDossier
+      );
+
+      // Ta formule exacte : (PU * TotalGénéralAr) / (TotalPuSaisi * Quantité)
+      const puSaisi = parseFloat(saisie.prixUnitaire) || 0;
+      const qteSaisie = parseFloat(saisie.quantite) || 0;
+   
+      const puAriaryCalcule = (totalPuSaisi > 0 && qteSaisie > 0) ? (puSaisi * total) / (totalPuSaisi * qteSaisie) : 0;
+
+
+      resultats[lot.id] = {
+        ...base,
+        puAriary: puAriaryCalcule,
+      };
     });
     return resultats;
-  }, [demandes, saisies, dossierData, montantTotalDossier]);
+  }, [demandes, saisies, dossierData, montantTotalDossier, total, fraisApprocheTotalCalcule]);
  
   // Totaux généraux (pour vérification / affichage en bas de tableau)
   const totaux = useMemo(() => {
     const valeurs = Object.values(resultatsParArticle);
+
+    // Somme des pu saisi par l'user
+    const totalPu = demandes ? demandes.lots.reduce((s, lot) => {
+        const pu = parseFloat(saisies[lot.id]?.prixUnitaire) || 0;
+        return s + pu;
+    }, 0) : 0;
+
     return {
-      montant: valeurs.reduce((s, v) => s + v.montant, 0),
-      cfr: valeurs.reduce((s, v) => s + v.cfr, 0),
-      assurance: valeurs.reduce((s, v) => s + v.assurance, 0),
-      coutTotalAr: valeurs.reduce((s, v) => s + v.coutTotalAr, 0),
+        totalPu,
+        montant: valeurs.reduce((s, v) => s + v.montant, 0),
+        cfr: valeurs.reduce((s, v) => s + v.cfr, 0),
+        assurance: valeurs.reduce((s, v) => s + v.assurance, 0),
+        coutTotalAr: valeurs.reduce((s, v) => s + v.coutTotalAr, 0),
     };
-  }, [resultatsParArticle]);
+  }, [resultatsParArticle, demandes, saisies]);
  
-  const totalAr = valeurCAF + fraisApprocheTotalCalcule;
+
+
+  // Calcule toutes les valeurs dérivées pour un article donné
+function calculerArticle(lot, dossierData, montantTotalDossier) {
+  const montant = calcMontant(lot.prixUnitaire, lot.quantite);
+  const proportion = calcProportion(montant, montantTotalDossier);
+ 
+  const partCout = calcPartProrata(dossierData.fobTotal, proportion);
+  const partMfob = calcPartProrata(dossierData.mfobTotal, proportion);
+  const partFret = calcPartProrata(dossierData.fretTotal, proportion);
+ 
+  // Coût et Fret (CFR) de l'article
+  const cfr = partCout + partMfob + partFret;
+ 
+  // Assurance 0,2% sur le CFR de l'article
+  const assurance = (cfr * taux_assurance) / 100;
+ 
+  // Part des frais d'approche du dossier (déjà en Ariary)
+  const partFraisApproche = calcPartProrata(
+    dossierData.fraisApprocheTotal,
+    proportion
+  );
+ 
+  // Valeur CAF de l'article (devise)
+  const valeurCaf = cfr + assurance;
+ 
+  const cours = parseFloat(dossierData.cours) || 0;
+//   const quantite = parseFloat(lot.quantite) || 0;
+ 
+  // Coût total de l'article en Ariary = (CAF en devise x cours) + frais d'approche (déjà en Ar)
+  const coutTotalAr = valeurCaf * cours + partFraisApproche;
+
+//   const totalPu = demandes ? demandes.lots.reduce((s, lot) => {
+//     const pu = parseFloat(saisies[lot.id]?.prixUnitaire) || 0;
+//     return s + pu;
+//   }, 0) : 0;
+
+
+ 
+  return {
+    montant,
+    proportion,
+    partCout,
+    partMfob,
+    partFret,
+    cfr,
+    assurance,
+    partFraisApproche,
+    valeurCaf,
+    coutTotalAr,
+  };
+}
+
 
   // ── Soumission ───────────────────────────────────────────────────────
- 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
- 
-    const lignesIncompletes = demandes.lots.filter((lot) => {
-      const s = saisies[lot.id];
-      return !s?.prixUnitaire || !s?.quantite;
-    });
- 
-    if (lignesIncompletes.length > 0) {
-      toast.error("Veuillez remplir le prix unitaire et la quantité pour chaque article");
-      return;
-    }
- 
-    setSubmitting(true);
-    try {
-      const articles = demandes.lots.map((lot) => {
-        const saisie = saisies[lot.id];
-        const resultat = resultatsParArticle[lot.id];
-        return {
-          idArticle: lot.id,
-          prixUnitaire: parseFloat(saisie.prixUnitaire),
-          quantite: parseFloat(saisie.quantite),
-          montant: resultat.montant,
-          proportion: resultat.proportion,
-          cfr: resultat.cfr,
-          assurance: resultat.assurance,
-          coutTotalAr: resultat.coutTotalAr,
-          puAriary: resultat.puAriary,
-        };
-      });
- 
-      await demandeService.enregistrerTraitement(id, {
-        cours: parseFloat(dossierData.cours),
-        fobTotal: parseFloat(dossierData.fobTotal),
-        mfobTotal: parseFloat(dossierData.mfobTotal),
-        fretTotal: parseFloat(dossierData.fretTotal),
-        fraisApprocheTotal: fraisApprocheTotalCalcule,
-        articles,
-      });
- 
-      toast.success("Traitement enregistré avec succès !");
-    } catch (err) {
-      console.error("Erreur enregistrement:", err.response?.data || err);
-      toast.error("Erreur lors de l'enregistrement du traitement");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+ const handleSubmit = async (e) => {
+  e.preventDefault();
 
+  // 1. Vérification que tous les champs obligatoires du tableau sont remplis
+  const lignesIncompletes = demandes.lots.filter((lot) => {
+    const s = saisies[lot.id];
+    return !s?.prixUnitaire || !s?.quantite;
+  });
+
+  if (lignesIncompletes.length > 0) {
+    toast.error("Veuillez remplir le prix unitaire et la quantité pour chaque article");
+    return;
+  }
+
+   if (lignesIncompletes.length > 0) {
+    toast.error("Veuillez remplir le prix unitaire et la quantité pour chaque article");
+    return;
+  }
+
+  // 2. Pas d'appel API ici ! On stocke temporairement l'ID et on affiche l'aperçu
+  setIdDemandeGenere(id);
+  setAfficherApercu(true);
+};
+
+// Fonction de génération et mise en page du PDF regroupé
+
+
+  const fetchOrigine = async () => {
+     try{
+        setLoading(true);
+        setError(null);
+        const response = await origineService.getAll();
+        setOrigine(response.data);
+    }catch(err){
+        setError(err.message || "Erreur de chargement")
+    }finally{
+        setLoading(false);
+    }
+  }
+    useEffect(()=>{
+        fetchOrigine();
+    }, [])
+    
+
+     const fetchFrs = async () => {
+     try{
+        setLoading(true);
+        setError(null);
+        const response = await frsService.getAll();
+        setFrs(response.data);
+    }catch(err){
+        setError(err.message || "Erreur de chargement")
+    }finally{
+        setLoading(false);
+    }
+  }
+    useEffect(()=>{
+        fetchFrs();
+    }, [])
+
+
+    if (afficherApercu) {
+        // Transformer l'objet resultatsParArticle en tableau pour l'aperçu
+        const articlesFormates = demandes.lots.map(lot => ({
+            id: lot.id,
+            designation: lot.designation,
+            codeLot: lot.codeLot,
+            prixUnitaire: saisies[lot.id]?.prixUnitaire || 0,
+            quantite: saisies[lot.id]?.quantite || 0,
+            immo: saisies[lot.id]?.immo || "",
+            // On passe les données calculées en temps réel
+            partFraisApproche: resultatsParArticle[lot.id]?.partFraisApproche || 0,
+            puAriary: resultatsParArticle[lot.id]?.puAriary || 0
+        }));
+
+        return (
+            <PageApercuDemande 
+                idDemande={idDemandeGenere} 
+                userRole="Demandeur" 
+                onRetour={() => setAfficherApercu(false)} 
+                // 💡 On injecte directement les vraies données saisies et calculées !
+                donneesInitiales={{
+                    dossierData: {
+                        ...dossierData,
+                        fraisApprocheTotal: fraisApprocheTotalCalcule 
+                    },
+                    articles: articlesFormates,
+                    statut: demandes.status
+                }}
+            />
+        );
+    }
+// const genererPDF = () => {
+  
+//     const doc = new jsPDF({
+//         orientation:"portrait",
+//         unit:"mm",
+//         format:"a4",
+//     });
+
+//     const margeGauche = 20;
+//     let yPosition = 20;
+
+//     doc.setFont("helvetica", "normal");
+
+//     // ─── SECTION 1 : EN-TÊTE (Ex: Logo, Nom entreprise) ───
+//     doc.setFontSize(20);
+//     doc.setFont("helvetica", "bold");
+//     doc.text("Nom de l'entreprise", margeGauche, yPosition);
+//     yPosition += 10;
+
+//     doc.setFontSize(12);
+//     doc.setFont("helvetica", "normal");
+//     doc.text("Adresse, Ville, Pays | Contact : email@domain.com", margeGauche, yPosition);
+
+//     // ─── LIGNE DE SÉPARATION GRAPHIQUE ───
+//     yPosition += 5;
+//     doc.setDrawColor(200, 200, 200);
+//     doc.line(margeGauche, yPosition, 190, yPosition);
+
+//   // ─── SECTION 2 : TITRE DU DOCUMENT ───
+//     yPosition += 15;
+//     doc.setFontSize(16);
+//     doc.setFont("helvetica", "bold");
+//     doc.text("TITRE DU DOCUMENT", margeGauche, yPosition);  
+
+//     // ─── SECTION 3 : LE CONTENU (À personnaliser) ───
+//     yPosition += 12;
+//     doc.setFontSize(11);
+//     doc.setFont("helvetica", "normal");
+
+//     // Exemple de texte dynamique ou statique
+//     doc.text(`Référence : REF-2026-001`, margeGauche, yPosition);
+//     yPosition += 7;
+//     doc.text(`Date : ${new Date().toLocaleDateString()}`, margeGauche, yPosition);
+
+//     yPosition += 15;
+//     // Bloc de texte long ou paragraphes
+//     const paragraphe = "<h1>Titre de l'article</h1><p>Contenu de l'article...</p>";
+
+//     // splitTextToSize permet de couper automatiquement le texte pour qu'il ne dépasse pas de la page
+//     const texteFormate = doc.splitTextToSize(paragraphe, 170);
+//     doc.text(texteFormate, margeGauche, yPosition);
+
+//     // ─── SECTION 4 : PIED DE PAGE ───
+//   // On force la position tout en bas de la page A4 (Hauteur totale ~297mm)
+//     const positionBasDePage = 280;
+//     doc.setFontSize(9);
+//     doc.setTextColor(120, 120, 120);
+//     doc.text("Page 1 sur 1 — Document généré automatiquement.", margeGauche, positionBasDePage);
+
+//     // 5. TÉLÉCHARGEMENT DU FICHIER
+//     doc.save("mon-document-personnalise.pdf");
+
+// };
 
    // ─────────────────────────────────────────────────────────────────────
   // Rendu
@@ -395,9 +564,96 @@ const STYLE_PAR_DEFAUT = { backgroundColor: "#F3F4F6", color: "#374151", borderC
 
                 <form action="" onSubmit={handleSubmit} method="post">
                     {/* ── Données globales du dossier ─────────────────────────── */}
-                    <div className=" ">
+                     <div className=" card mt-3 p-4">
+                         <div className="row g-3">
+                              <div className="col-md-4">
+                                 <label htmlFor="" className="form-label">Type de demande</label>
+
+                                 
+                                 <select name="typeDossier" id="" className="form-control" value={dossierData.typeDossier} onChange={(e) => updateDossierField("typeDossier", e.target.value)}>
+                                     <option value="">Sélectionner le type</option>
+                                     <option value="Groupage">Groupage</option>
+                                     <option value="Malte">Malte</option>
+                                     <option value="Sucre">Sucre</option>
+                                 </select>
+                             </div>
+                             <div className="col-md-4">
+                                 <label htmlFor="" className="form-label">Nombre TC</label>
+
+                                 <input
+                                    type="number"
+                                    step="0.01"
+                                    className="form-control"
+                                    value={dossierData.tc}
+                                    onChange={(e) => updateDossierField("tc", e.target.value)}
+                                    required
+                                    />
+                             </div>
+
+                             <div className="col-md-4">
+                                 <label htmlFor="" className="form-label">Origine</label>
+
+                                 
+                                 <select name="origine" id="" className="form-control" value={dossierData.origine || ""} onChange={(e) => updateDossierField("origine", e.target.value)} disabled={loading}>
+                                     <option value="">
+                                         {loading ? "Chargement des origines..." : "Sélectionner l'origine"}
+                                     </option>
+                                     {!loading && origine && origine.map((orig) => (
+                                         <option key={orig.id || orig.Id} value={orig.pays || orig.Pays || orig}>
+                                             {orig.pays || orig.Pays || orig}
+                                         </option>
+                                     ))}
+                                 </select>
+                             </div>
+
+                               <div className="col-md-4">
+                                 <label htmlFor="" className="form-label">Fournisseur</label>
+
+                                 
+                                 <select name="frs" id="" className="form-control" value={dossierData.frs || ""} onChange={(e) => updateDossierField("frs", e.target.value)} disabled={loading}>
+                                     <option value="">
+                                         {loading ? "Chargement des fournisseurs..." : "Sélectionner le fournisseur"}
+                                     </option>
+                                     {!loading && frs && frs.map((f) => (
+                                         <option key={f.id || f.Id} value={f.nom_frs || f.Nom_frs || f}>
+                                             {f.nom_frs || f.Nom_frs || f}
+                                         </option>
+                                     ))}
+                                 </select>
+                             </div>
+
+                         <div className="col-md-4">
+                                 <label htmlFor="" className="form-label">Port</label>
+
+                                 
+                                 <select name="port" id="" className="form-control" value={dossierData.port} onChange={(e) => updateDossierField("port", e.target.value)}>
+                                     <option value="">Sélectionner le port</option>
+                                     <option value="Diégo">Diégo</option>
+                                     <option value="Tamatave">Tamatave</option>
+                                    
+                                 </select>
+                             </div>
+
+                             <div className="col-md-4">
+                                 <label htmlFor="" className="form-label">Usine</label>
+
+                                 
+                                 <select name="usine" id="" className="form-control" value={dossierData.usine} onChange={(e) => updateDossierField("usine", e.target.value)}>
+                                     <option value="">Sélectionner l'usine</option>
+                                     <option value="Antsirabe">Antsirabe</option>
+                                     <option value="Ambatolampy">Ambatolampy</option>
+                                 </select>
+                             </div>
+
+                           
+                         </div>
+                     </div>
+
+<div className=" card mt-3 p-4">
+
                         <h4>Données générales du dossier</h4>
                         <div className="row g-3">
+
                             <div className="col-md-2">
                                 <label htmlFor="" className="form-label">Cours de change (Ar)</label>
 
@@ -424,12 +680,12 @@ const STYLE_PAR_DEFAUT = { backgroundColor: "#F3F4F6", color: "#374151", borderC
                                 <div className="col-md-2">
                                     <label className="form-label">MFOB total (devise)</label>
                                     <input
-                                    type="number"
-                                    step="0.01"
-                                    className="form-control"
-                                    value={dossierData.mfobTotal}
-                                    onChange={(e) => updateDossierField("mfobTotal", e.target.value)}
-                                    required
+                                        type="number"
+                                        step="0.01"
+                                        className="form-control"
+                                        value={dossierData.mfobTotal}
+                                        onChange={(e) => updateDossierField("mfobTotal", e.target.value)}
+                                        required
                                     />
                                 </div>
                                 <div className="col-md-2">
@@ -445,6 +701,19 @@ const STYLE_PAR_DEFAUT = { backgroundColor: "#F3F4F6", color: "#374151", borderC
                                 </div>
                                 <div className="col-md-4">
                                     <label className="form-label">
+                                        Valeur CAF totale (Ar)
+                                        <small className="text-muted"> — (FOB + MFOB + Fret) + Assurance</small>
+                                    </label>
+                                    <input
+                                    type="number"
+                                    step="0.01"
+                                    className="form-control"
+                                    value={valeurCAF}
+                                    readOnly
+                                    />
+                                </div>
+                                <div className="col-md-4">
+                                    <label className="form-label">
                                     Frais d'approche totaux (Ar)
                                     <small className="text-muted"> — douane, GasyNet, transit, transport...</small>
                                     </label>
@@ -455,7 +724,20 @@ const STYLE_PAR_DEFAUT = { backgroundColor: "#F3F4F6", color: "#374151", borderC
                                     value={fraisApprocheTotalCalcule}
                                     readOnly
                                     />
-                            </div>
+                                </div>
+                                <div className="col-md-4">
+                                    <label className="form-label">
+                                        Total général (Ar)
+                                        <small className="text-muted"> — Valeur CAF + Frais d'approche</small>
+                                    </label>
+                                    <input
+                                    type="number"
+                                    step="0.01"
+                                    className="form-control"
+                                    value={total}
+                                    readOnly
+                                    />
+                                </div>
                         </div>
                     </div>
 
@@ -500,6 +782,10 @@ const STYLE_PAR_DEFAUT = { backgroundColor: "#F3F4F6", color: "#374151", borderC
                                 <input type="number" step="0.01" className="form-control" value={dossierData.apmf} onChange={(e) => updateDossierField("apmf", e.target.value)} />
                             </div>
                             <div className="col-md-4">
+                                <label className="form-label">DDP</label>
+                                <input type="number" step="0.01" className="form-control" value={dossierData.ddp} onChange={(e) => updateDossierField("ddp", e.target.value)} />
+                            </div>
+                            <div className="col-md-4">
                                 <label className="form-label">Contrôle Radioactive</label>
                                 <input type="number" step="0.01" className="form-control" value={dossierData.controleRadioactive} onChange={(e) => updateDossierField("controleRadioactive", e.target.value)} />
                             </div>
@@ -522,10 +808,7 @@ const STYLE_PAR_DEFAUT = { backgroundColor: "#F3F4F6", color: "#374151", borderC
                                 <th style={{ width: "110px" }}>PU (devise)<br/><small className="text-muted">saisi</small></th>
                                 <th style={{ width: "90px" }}>Quantité<br/><small className="text-muted">saisi</small></th>
                                 <th>Montant</th>
-                                <th>% Dossier</th>
-                                <th>CFR (devise)</th>
-                                <th>Assurance</th>
-                                <th>Frais approche (Ar)</th>
+                                <th>Code IMMO</th>
                                 <th>PU en Ariary</th>
                             </tr>
                             </thead>
@@ -569,14 +852,22 @@ const STYLE_PAR_DEFAUT = { backgroundColor: "#F3F4F6", color: "#374151", borderC
                                     />
                                     </td>
             
-                                    {/* 🤖 Calculs automatiques en lecture seule */}
+                                    {/* Calcul automatique en lecture seule */}
                                     <td className="text-end">{fmt(r.montant)}</td>
-                                    <td className="text-end">{fmt(r.proportion)} %</td>
-                                    <td className="text-end">{fmt(r.cfr)}</td>
-                                    <td className="text-end">{fmt(r.assurance)}</td>
-                                    <td className="text-end">{fmt(r.partFraisApproche)}</td>
+                                    {/* ✏️ Champ saisi - Code IMMO */}
+                                    <td>
+                                        <input
+                                            type="text"
+                                            className="form-control form-control-sm"
+                                            value={saisie.immo}
+                                            onChange={(e) =>
+                                            updateSaisieArticle(lot.id, "immo", e.target.value)
+                                            }
+                                            placeholder="Code IMMO"
+                                        />
+                                    </td>
                                     <td className="text-end">
-                                    <strong>{fmt(r.puAriary)} Ar</strong>
+                                        <strong>{fmt(r.puAriary)} Ar</strong>
                                     </td>
                                 </tr>
                                 );
@@ -584,24 +875,22 @@ const STYLE_PAR_DEFAUT = { backgroundColor: "#F3F4F6", color: "#374151", borderC
                             </tbody>
                             <tfoot>
                             <tr className="table-light">
-                                <td colSpan={3}><strong>Totaux</strong></td>
-                                <td className="text-end"><strong>{fmt(totaux.montant)}</strong></td>
-                                <td className="text-end">100 %</td>
-                                <td className="text-end"><strong>{fmt(totaux.cfr)}</strong></td>
-                                <td className="text-end"><strong>{fmt(totaux.assurance)}</strong></td>
-                                <td></td>
-                                <td className="text-end"><strong>{fmt(totaux.coutTotalAr)} Ar</strong></td>
+                                <td className="text-end"><strong>Totaux</strong></td>
+                                <td className="text-end"><strong>{fmt(totaux.totalPu)}</strong></td>
+                                
                             </tr>
                             </tfoot>
                         </table>
                         </div>
                     </div>
             
-                    <div className="mt-3 mb-5 text-end">
-                        <button type="submit" className="btn btn-primary" disabled={submitting}>
-                        {submitting ? "Enregistrement..." : "Enregistrer le traitement"}
-                        </button>
-                    </div>
+                    {demandes.status === "Nouvelle" && (
+                        <div className="mt-3 mb-5 text-end">
+                            <button type="submit" className="btn btn-primary" disabled={submitting}>
+                            {submitting ? "Enregistrement..." : "Enregistrer le traitement"}
+                            </button>
+                        </div>
+                    )}
                 </form>
                         
                 

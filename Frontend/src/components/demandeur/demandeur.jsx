@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { toast, Toaster } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "../ui/dialog";
 import { Eye, FileText, Plus, Send, Trash2 } from "lucide-react";
@@ -11,6 +11,7 @@ import "./demandeur.css";
 import { useAuth } from "../../context/AuthContext";
 import Nav from "../nav/nav";
 import { articleService, demandeService } from "../../services/api";
+import api from "../../services/api";
 import axios from "axios"; // Ensure axios is imported
 
 function todayISO() {
@@ -41,6 +42,10 @@ function Demandeur() {
     const [lots, setLots] = useState([emptyLot()]);
     const [submitting, setSubmitting] = useState(false);
 
+    const [openPdf, setOpenPdf] = useState(false);
+    const [selectedPdf, setSelectedPdf] = useState("");
+    const dialogPdfRef = useRef(null);
+
     const [filtrerDate, setFiltrerDate] = useState("");
     const [filtrerStatus, setFiltrerStatus] = useState("");
     const [filtrerLots, setFiltrerLots] = useState("");
@@ -63,7 +68,7 @@ function Demandeur() {
                 motif: d.motif ?? d.Motif ?? "",
                 status: d.status ?? d.Status ?? "Nouvelle",
                 date: d.dateTime ?? d.DateTime,
-                // d.articles correspond à votre "List<ArticleResponseDto> Articles" côté C#
+                pdfFileName: d.pdfFileName ?? d.PdfFileName ?? "",
                 lots: (d.articles ?? d.Articles ?? []).map((a) => ({
                     id: a.id ?? a.Id ?? 0,  
                     codeLot: a.codeLot ?? a.CodeLot ?? "",
@@ -98,6 +103,21 @@ function Demandeur() {
         } finally {
             setLoadingDetail(false);
         }
+    };
+
+    const ouvrirPdf = (d) => {
+        if (!d.pdfFileName) {
+            toast.error("Aucun PDF disponible pour cette demande");
+            return;
+        }
+        const baseUrl = api.defaults.baseURL ? new URL(api.defaults.baseURL).origin : "http://localhost:5233";
+        setSelectedPdf(`${baseUrl}/uploads/pdfs/${d.pdfFileName}`);
+        setOpenPdf(true);
+    };
+
+    const fermerPdf = () => {
+        setOpenPdf(false);
+        setSelectedPdf("");
     };
 
     // 4. Gestion des formulaires
@@ -282,7 +302,6 @@ function Demandeur() {
                     <header className="flex flex-wrap items-center justify-between gap-4">
                         <div>
                             <h1 className="text-3xl font-bold tracking-tight">Mes demandes</h1>
-                            <p className="text-muted-foreground">Créez une demande contenant un ou plusieurs lots.</p>
                         </div>
                     </header>
 
@@ -340,7 +359,7 @@ function Demandeur() {
                             </nav>
                         </CardHeader>
                         <CardContent>
-                            <DemandesTable data={demandesFiltrees} onDetail={handleDetail} empty="Aucune demande enregistrée." />
+                            <DemandesTable data={demandesFiltrees} onDetail={handleDetail} onVoirPdf={ouvrirPdf} empty="Aucune demande enregistrée." />
                         </CardContent>
                     </Card>
                 </div>
@@ -362,6 +381,7 @@ function Demandeur() {
                                         <TableHead>IdArticle</TableHead>
                                         <TableHead>Code Lot</TableHead>
                                         <TableHead>Désignation</TableHead>
+                                        <TableHead>Motif</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -370,6 +390,7 @@ function Demandeur() {
                                             <TableCell>{a.id}</TableCell>
                                             <TableCell className="font-mono">{a.codeLot || "—"}</TableCell>
                                             <TableCell>{a.designation || "—"}</TableCell>
+                                            <TableCell>{detail.motif || "—"}</TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
@@ -377,12 +398,29 @@ function Demandeur() {
                         )}
                     </DialogContent>
                 </Dialog>
+                
+                <Dialog open={openPdf} onOpenChange={setOpenPdf}>
+                    <DialogContent className="dialog_demande_content" overlayClassName="fixed inset-0 bg-black/30 backdrop-blur-sm" style={{ maxWidth: '96vw', width: '96vw', maxHeight: '96vh', height: '96vh', display: 'flex', flexDirection: 'column', padding: 0 }}>
+                        <DialogHeader style={{ padding: '16px 20px 0' }}>
+                            <DialogTitle>Prévisualisation du PDF</DialogTitle>
+                        </DialogHeader>
+                        <div style={{ flex: 1, minHeight: 0, padding: '12px 20px 20px' }}>
+                            {selectedPdf && (
+                                <iframe 
+                                    src={selectedPdf} 
+                                    style={{ width: '100%', height: '100%', border: 'none', borderRadius: '6px' }}
+                                    title="Aperçu PDF"
+                                />
+                            )}
+                        </div>
+                    </DialogContent>
+                </Dialog>
             </div>
         </main>
     );
 }
 
-function DemandesTable({ data, onDetail, empty }) {
+function DemandesTable({ data, onDetail, onVoirPdf, empty }) {
     if (data.length === 0) {
         return <p className="py-6 text-center text-sm text-muted-foreground">{empty}</p>;
     }
@@ -416,11 +454,18 @@ function DemandesTable({ data, onDetail, empty }) {
                                 
                             }}>
                                 {d.status}
-                            </TableCell>0
+                            </TableCell>
                             <TableCell className="px-4 py-3 text-right">
-                                <Button size="sm" variant="outline" className="gap-1 btn_detail" onClick={() => onDetail(d)}>
-                                    <Eye className="h-4 w-4" /> Détail
-                                </Button>
+                                <div className="flex justify-end gap-2">
+                                    <Button size="sm" variant="outline" className="gap-1 btn_detail" onClick={() => onDetail(d)}>
+                                        <Eye className="h-4 w-4" /> Détail
+                                    </Button>
+                                    {(d.status === "Validée" || d.status === "Refusée") && d.pdfFileName && (
+                                        <Button size="sm" variant="outline" className="gap-1" onClick={() => onVoirPdf(d)}>
+                                            <Eye className="h-4 w-4 eyehover"  /> Voir fichier
+                                        </Button>
+                                    )}
+                                </div>
                             </TableCell>
                         </TableRow>
                     ))}

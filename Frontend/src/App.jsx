@@ -15,6 +15,7 @@ import Welcome from "./components/Welcome";
 import ListeUser from "./components/admin/utilisateur/ListeUser"; 
 import Comptabilite from "./components/comptabilite/comptabilite";
 import { TraitementDemande } from "./components/comptabilite/traitement/traitementDemande";
+import Valid from "./components/validateur/valid";
 
 function App() {
   const { user, login} = useAuth();
@@ -78,7 +79,7 @@ function App() {
       <Route path="/home@demandeur" element={<ProtectedRoute roles={["Demandeur"]}><Demandeur /></ProtectedRoute>} />
 
       {/* 🔒 ACCÈS VALIDATEUR ET COMPTABILITÉ (Ajoutez vos composants ici plus tard) */}
-      <Route path="/home@validateur" element={<ProtectedRoute roles={["Validateur"]}><div className="p-4">Espace Validateur</div></ProtectedRoute>} />
+      <Route path="/home@validateur" element={<ProtectedRoute roles={["Validateur"]}><Valid /></ProtectedRoute>} />
       <Route path="/home@comptabilite" element={<ProtectedRoute roles={["Comptabilité"]}><Comptabilite/></ProtectedRoute>} />
       <Route path="/traiter-demande/:id"  element={<ProtectedRoute roles={["Comptabilité"]}><TraitementDemande/></ProtectedRoute>} />
       {/* Si l'URL n'est pas reconnue ou qu'il y a un problème, retour à l'accueil de bienvenue */}

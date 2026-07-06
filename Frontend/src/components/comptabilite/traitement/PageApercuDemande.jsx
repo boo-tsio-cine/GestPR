@@ -1,0 +1,495 @@
+import { toast } from "sonner";
+import { demandeService } from "../../../services/api";
+import { useEffect, useMemo, useState } from 'react';
+import html2pdf from 'html2pdf.js';
+import "./PageApercuDemande.css";
+
+const taux_assurance = 0.2;
+
+function calcMontant(prixUnitaire, quantite) {
+    const pu = parseFloat(prixUnitaire) || 0;
+    const qte = parseFloat(quantite) || 0;
+    return pu * qte;
+}
+
+function calcMontantTotalDossier(lots) {
+    return lots.reduce(
+        (total, lot) => total + calcMontant(lot.prixUnitaire, lot.quantite), 0
+    );
+}
+
+function calcProportion(montantArticle, montantTotalDossier){
+    if (!montantTotalDossier) return 0;
+    return (montantArticle / montantTotalDossier) * 100;
+}
+
+function calcPartProrata(montantGlobal, proportion) {
+    const total = parseFloat(montantGlobal) || 0;
+    return (total * proportion) / 100;
+}
+
+function fmt(n, decimals = 2) {
+    if (!isFinite(n)) return "0";
+    return new Intl.NumberFormat("fr-FR", {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+    }).format(n);
+}
+
+export default function PageApercuDemande({idDemande, userRole = "Demandeur", onRetour, donneesInitiales }) {
+    const [dossierData, setDossierData] = useState(donneesInitiales?.dossierData || null);
+    const [articles, setArticles] = useState(donneesInitiales?.articles || []);
+    const [statut, setStatut] = useState(donneesInitiales?.statut || "Nouvelle");
+    const [loading, setLoading] = useState(!donneesInitiales);
+
+    useEffect(() => {
+        if (donneesInitiales) {
+            setDossierData(donneesInitiales.dossierData);
+            setArticles(donneesInitiales.articles);
+            setStatut(donneesInitiales.statut);
+            setLoading(false);
+            return;
+        }
+
+        if (!idDemande) return;
+        setLoading(true);
+        
+        demandeService.getDemande(idDemande)
+          .then(res => {
+              setStatut(res.data?.status || "Nouvelle");
+          })
+          .catch(err => console.error(err))
+          .finally(() => setLoading(false));
+          
+    }, [idDemande, donneesInitiales]);
+
+    const fraisApprocheTotalCalcule = useMemo(() => {
+        if (!dossierData) return 0;
+        const clesFrais = ["deboursTransit", "remunerationTransit", "deboursMagasinage", "transportLocal", "commissionRemun", "commissionBancaires", "douanes", "prestationGasyNet", "apmf", "ddp", "controleRadioactive", "autresDat"
+        ];
+        
+        const maritimeFret = parseFloat(dossierData.fretTotal * dossierData.cours) || 0;
+        const maritimeMfob = parseFloat(dossierData.mfobTotal * dossierData.cours) || 0;
+        const totalAutresFrais = clesFrais.reduce((total, cle) => {
+            const valeur = parseFloat(dossierData[cle]) || 0;
+            return total + valeur;
+        }, 0);
+        
+        return maritimeFret + maritimeMfob + totalAutresFrais;
+    }, [dossierData]);
+
+    const montantTotalDossier = useMemo(() => {
+        if (!articles || articles.length === 0) return 0;
+        return calcMontantTotalDossier(articles);
+    }, [articles]);
+
+    const valeurCAF = useMemo(() => {
+        if (!dossierData) return 0;
+        const fob = parseFloat(dossierData.fobTotal) || 0;
+        const mfob = parseFloat(dossierData.mfobTotal) || 0;
+        const fret = parseFloat(dossierData.fretTotal) || 0;
+        const assurance = ((fob + mfob + fret) * taux_assurance) / 100;
+        const valcaf = fob + mfob + fret + assurance;
+        return valcaf * (parseFloat(dossierData.cours) || 0);
+    }, [dossierData?.fobTotal, dossierData?.mfobTotal, dossierData?.fretTotal, dossierData?.cours]);
+
+    const total = useMemo(() => {
+        if (!dossierData) return 0;
+        const mfob = parseFloat(dossierData.mfobTotal) || 0;
+        const fret = parseFloat(dossierData.fretTotal) || 0;
+        return valeurCAF + fraisApprocheTotalCalcule - ((mfob + fret) * (parseFloat(dossierData.cours) || 0));
+    }, [valeurCAF, fraisApprocheTotalCalcule, dossierData?.mfobTotal, dossierData?.fretTotal, dossierData?.cours]);
+
+    const resultatsParArticle = useMemo(() => {
+        if (!articles || !dossierData) return {};
+        const resultats = {};
+
+        const totalPuSaisi = articles.reduce((sum, article) => {
+            return sum + (parseFloat(article.prixUnitaire) || 0);
+        }, 0);
+
+        articles.forEach((article) => {
+            const base = calculerArticle(
+                { ...article, prixUnitaire: article.prixUnitaire, quantite: article.quantite },
+                { ...dossierData, fraisApprocheTotal: fraisApprocheTotalCalcule },
+                montantTotalDossier
+            );
+
+            const puSaisi = parseFloat(article.prixUnitaire) || 0;
+            const qteSaisie = parseFloat(article.quantite) || 0;
+        
+            const puAriaryCalcule = (totalPuSaisi > 0 && qteSaisie > 0) ? (puSaisi * total) / (totalPuSaisi * qteSaisie) : 0;
+
+            resultats[article.id] = {
+                ...article,
+                ...base,
+                puAriary: puAriaryCalcule,
+                immo: article.immo || ""
+            };
+        });
+        return resultats;
+    }, [articles, dossierData, montantTotalDossier, total, fraisApprocheTotalCalcule]);
+
+    const totaux = useMemo(() => {
+        const valeurs = Object.values(resultatsParArticle);
+
+        const totalPu = articles ? articles.reduce((s, article) => {
+            return s + (parseFloat(article.prixUnitaire) || 0);
+        }, 0) : 0;
+
+        return {
+            totalPu,
+            montant: valeurs.reduce((s, v) => s + (v.montant || 0), 0),
+            cfr: valeurs.reduce((s, v) => s + (v.cfr || 0), 0),
+            assurance: valeurs.reduce((s, v) => s + (v.assurance || 0), 0),
+            coutTotalAr: valeurs.reduce((s, v) => s + (v.coutTotalAr || 0), 0),
+        };
+    }, [resultatsParArticle, articles]);
+
+    function calculerArticle(lot, dossierData, montantTotalDossier) {
+        const montant = calcMontant(lot.prixUnitaire, lot.quantite);
+        const proportion = calcProportion(montant, montantTotalDossier);
+
+        const partCout = calcPartProrata(dossierData.fobTotal, proportion);
+        const partMfob = calcPartProrata(dossierData.mfobTotal, proportion);
+        const partFret = calcPartProrata(dossierData.fretTotal, proportion);
+
+        const cfr = partCout + partMfob + partFret;
+
+        const assurance = (cfr * taux_assurance) / 100;
+
+        const partFraisApproche = calcPartProrata(
+            dossierData.fraisApprocheTotal,
+            proportion
+        );
+
+        const valeurCaf = cfr + assurance;
+
+        const cours = parseFloat(dossierData.cours) || 0;
+
+        const coutTotalAr = valeurCaf * cours + partFraisApproche;
+
+        return {
+            montant,
+            proportion,
+            partCout,
+            partMfob,
+            partFret,
+            cfr,
+            assurance,
+            partFraisApproche,
+            valeurCaf,
+            coutTotalAr,
+        };
+    }
+
+   const handleChangerStatut = async (nouveauStatut) => {
+        try {
+            toast.info("Mise à jour du statut...");
+            // Appel au backend
+            await demandeService.updateStatus(idDemande, nouveauStatut);
+            setStatut(nouveauStatut);
+            toast.success(`La demande a été ${nouveauStatut.toLowerCase()} avec succès !`);
+            
+            if (onRetour) {
+                setTimeout(() => onRetour(), 1500);
+            }
+        } catch (err) {
+            console.error(err);
+            toast.error("Erreur lors du changement de statut");
+        }
+    };
+
+    const handleExporterPDF = () => {
+        const element = document.getElementById('zone-a4-pdf');
+        const options = {
+            margin: 0,
+            filename: `Demande_Approche_N_${idDemande}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+        html2pdf().from(element).save();
+    };
+
+    const handleEnvoyerOfficiel = async () => {
+        // 1. Cibler la zone A4 simulée à l'écran
+        const element = document.getElementById('zone-a4-pdf');
+        if (!element) {
+            toast.error("Erreur : Impossible de localiser la zone du document.");
+            return;
+        }
+
+        try {
+            toast.info("Génération du document PDF officiel...");
+
+            // Configuration pour html2pdf
+            const options = {
+                margin: 0,
+                filename: `Demande_Approche_N_${idDemande}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            // 2. Extraire le PDF sous forme de fichier binaire brut (Blob) au lieu de le télécharger
+            const pdfBlob = await html2pdf().from(element).set(options).output('blob');
+
+            // 3. Encapsuler le Blob dans un objet FormData pour l'envoi multipart
+            const formData = new FormData();
+            formData.append("pdfFile", pdfBlob, `Demande_Approche_N_${idDemande}.pdf`);
+
+            toast.info("Envoi de la demande au circuit de validation...");
+
+            // 4. Expédition au service API révisé
+            await demandeService.soumettreTraitement(idDemande, formData);
+            await demandeService.updateStatus(idDemande, "En cours");
+            setStatut("En cours");
+
+            toast.success("🚀 Demande envoyée avec succès au validateur !");
+            alert("Demande envoyée avec succès !");
+            setTimeout(() => {
+                onRetour(); 
+            }, 2000);
+
+        } catch (err) {
+            console.error("Erreur lors de l'envoi :", err);
+            toast.error("Une erreur est survenue lors de l'envoi.");
+        }
+    };
+
+    if (loading) return <div className="text-center mt-5"><h4>Chargement de l'aperçu...</h4></div>;
+    if (!dossierData) return <div className="alert alert-danger m-5">Erreur : Impossible de charger les données.</div>;
+
+    const valeurs = Object.values(resultatsParArticle);
+
+    const montantCFR = (parseFloat(dossierData.fobTotal) || 0) + (parseFloat(dossierData.mfobTotal) || 0) + (parseFloat(dossierData.fretTotal) || 0);
+
+    const assuranceValue = (montantCFR * taux_assurance) / 100;
+
+    const fmtDevise = (val) => {
+        if (!dossierData?.cours || !val) return "0";
+        const valeurAr = parseFloat(val) || 0;
+        const valeurDevise = valeurAr / (parseFloat(dossierData.cours) || 1);
+        return new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(valeurDevise);
+    };
+
+    const fmtAr = (val) => new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val || 0);
+
+    const fretValue = (parseFloat(dossierData?.mfobTotal) || 0) + (parseFloat(dossierData?.fretTotal) || 0);
+    const droitEtTaxesValue = ((parseFloat(dossierData?.douanes) || 0) + (parseFloat(dossierData?.prestationGasyNet) || 0) + (parseFloat(dossierData?.apmf) || 0) + (parseFloat(dossierData?.ddp) || 0)) / (parseFloat(dossierData?.cours) || 1);
+    const commissionValue = ((parseFloat(dossierData?.debarquementValue) || 0) + (parseFloat(dossierData?.deboursMagasinage) || 0)) + ((parseFloat(dossierData?.commissionRemun) || 0) + (parseFloat(dossierData?.commissionBancaires) || 0)) + parseFloat(dossierData?.deboursTransit || 0) + parseFloat(dossierData?.remunerationTransit || 0);
+    const debarquementValue = parseFloat(dossierData?.deboursTransit || 0) + parseFloat(dossierData?.remunerationTransit || 0);
+
+    const commissionValueDF = commissionValue / (parseFloat(dossierData?.cours) || 1);
+    const transportLocalDF = (parseFloat(dossierData?.transportLocal) || 0) / (parseFloat(dossierData?.cours) || 1);
+
+    const fraisapproche = fretValue + droitEtTaxesValue + commissionValueDF + transportLocalDF + assuranceValue;
+
+    return (
+        <div className="pdf-preview-background">
+            <div className="no-print action-bar">
+                <button className="btn btn-secondary btn-sm me-2" onClick={onRetour}>⬅️ Retour</button>
+                <button className="btn btn-primary btn-sm me-4" onClick={handleExporterPDF}>⬇️ Télécharger le PDF</button>
+
+                {userRole === "Validateur" && statut === "En cours" && (
+                    <div className="d-inline-block border-start ps-3">
+                        <span className="me-2 text-white text-sm">Décision :</span>
+                        <button className="btn btn-success btn-sm me-2" onClick={() => handleChangerStatut("Validé")}>✔️ Valider</button>
+                        <button className="btn btn-danger btn-sm" onClick={() => handleChangerStatut("Refusé")}>❌ Refuser</button>
+                    </div>
+                )}
+            </div>
+
+            <div id="zone-a4-pdf" className="page-a4">
+                
+
+                <div className="pdf-header">
+                    <div className="image">
+                        <img src="/public/image/STA_LOGO_RVB.png" alt="" srcset="" />
+                    </div>
+                </div>
+
+                <div className="pdf-title-block">
+                    <h4>FICHE DE DOSSIER & COÛT DE REVIENT</h4>
+                    <span className="ref-text">DEM-{String(idDemande).padStart(3, '0')}</span>
+                </div>
+
+               
+                <table className="table-pdf mb-4">
+                    <tbody>
+                        <tr>
+                            <td className="leaf-bold">Type de demande :</td>
+                            <td>{dossierData.typeDossier || "Non défini"}</td>
+                            <td className="leaf-bold">Nombre TC :</td>
+                            <td>{dossierData.tc || 0}</td>
+                        </tr>
+                        <tr>
+                            <td className="leaf-bold">Origine :</td>
+                            <td>{dossierData.origine || "Non défini"}</td>
+                            <td className="leaf-bold">Fournisseur :</td>
+                            <td>{dossierData.frs || "Non défini"}</td>
+                        </tr>
+                        <tr>
+                            <td className="leaf-bold">Port :</td>
+                            <td>{dossierData.port || "Non défini"}</td>
+                            <td className="leaf-bold">Usine :</td>
+                            <td>{dossierData.usine || "Non défini"}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <table  className="table-pdf mb-4">
+                    <tbody>
+                        <tr className="table-row-highlight">
+                             <td className="leaf-bold">Cours de change :</td>
+                            <td colSpan="3">{fmt(dossierData.cours)} Ar</td>
+                        </tr>
+                    </tbody>
+
+                </table>
+
+                <table className="table-pdf mb-4">
+                    <tbody>
+                        <tr>
+                            <td>1</td>
+                            <td className="w-20 leaf-bold">Montant FOB</td>
+                            <td className="w-20 text-end">{fmt(dossierData.fobTotal)} </td>
+                        </tr>
+                        <tr>
+                            <td>2</td>
+                            <td className="w-20 leaf-bold">Fret</td>
+                            <td className="w-20 text-end">{fmt(dossierData.fretTotal)} </td>
+                        </tr>
+                        <tr>
+                            <td>3</td>
+                            <td className="w-20 leaf-bold">Coût de mise FOB</td>
+                            <td className="w-20 text-end">{fmt(dossierData.mfobTotal)} </td>
+                        </tr>
+                        <tr className="table-row-highlight text-white" style={{ backgroundColor: "#d1d37e" }}>
+                            <td>4</td>
+                            <td>Montant CFR (1+2+3)</td>
+                            <td colSpan="3" className=" text-end"><strong>{fmt(montantCFR)} </strong></td>
+                        </tr>
+                        <tr className="table-row-highlight text-white" style={{ backgroundColor: "#e3e70d" }}>
+                            <td>5</td>
+                            <td>FRET (2+3)</td>
+                            <td className=" text-end"><strong>{fmt(fretValue)} </strong></td>
+                        </tr>
+                        <tr>
+                            <td>6</td>
+                            <td>Douanes</td>
+                            <td className="text-end">{fmtDevise(dossierData.douanes)} </td>
+                        </tr>
+                        <tr>
+                            <td>7</td>
+                            <td>Prestation GasyNet</td>
+                            <td className="text-end">{fmtDevise(dossierData.prestationGasyNet)} </td>
+                        </tr>
+                        <tr>
+                            <td>8</td>
+                            <td>APMF</td>
+                            <td className="text-end">{fmtDevise(dossierData.apmf)} </td>
+                        </tr>
+                        <tr>
+                            <td>9</td>
+                            <td>DDP</td>
+                            <td className="text-end">{fmtDevise(dossierData.ddp)} </td>
+                        </tr>
+                        <tr className="table-row-highlight text-white" style={{ backgroundColor: "#e7d90d" }}>
+                            <td>10</td>
+                            <td>Droit&Taxes (6+7+8+9)</td>
+                            <td className="text-end"><strong>{fmt(droitEtTaxesValue)} </strong></td>
+                        </tr>
+                        <tr>
+                            <td>11</td>
+                            <td>Débarquement (Transit)</td>
+                            <td className="text-end"><strong>{fmtDevise(debarquementValue)} </strong></td>
+                        </tr>
+                        <tr>
+                            <td>12</td>
+                            <td>Débours Magasinage</td>
+                            <td className="text-end">{fmtDevise(dossierData.deboursMagasinage)} </td>
+                        </tr>
+                        <tr>
+                            <td>13</td>
+                            <td>Commission Rémun</td>
+                            <td className="text-end">{fmtDevise(dossierData.commissionRemun)} </td>
+                        </tr>
+                        <tr>
+                            <td>14</td>
+                            <td>Commission Bancaires</td>
+                            <td className="text-end">{fmtDevise(dossierData.commissionBancaires)} </td>
+                        </tr>
+                        <tr className="table-row-highlight text-white" style={{ backgroundColor: "#e7d90d" }}>
+                            <td>15</td>
+                            <td>Commission (11+12+13+14)</td>
+                            <td className="text-end"><strong>{fmtDevise(commissionValue)} </strong></td>
+                        </tr>
+                        <tr>
+                            <td>16</td>
+                            <td>Transport Local</td>
+                            <td className="text-end">{fmtDevise(dossierData.transportLocal)} </td>
+                        </tr>
+                        <tr className="table-row-highlight text-white" style={{ backgroundColor: "#e7d90d" }}>
+                            <td>17</td>
+                            <td>Assurance (0.2% CFR)</td>
+                            <td className="text-end"><strong>{fmtDevise(assuranceValue * (parseFloat(dossierData.cours) || 1))} </strong></td>
+                        </tr>
+                        <tr className="table-row-highlight text-white" style={{ backgroundColor: "#e7d90d" }}>
+                            <td>18</td>
+                            <td>Frais d'approche total</td>
+                            <td className="text-end"><strong>{fmt(fraisapproche)} </strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                
+                <table className="table-articles">
+                    <thead>
+                        <tr>
+                            <th>Code Lot</th>
+                            <th>Désignation de l'Article</th>
+                            <th>Code IMMO</th>
+                            <th className="text-end">PU (devise)</th>
+                            <th className="text-end">Quantité</th>
+                            <th className="text-end">PU en Ariary (Ar)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {valeurs.map((art, index) => (
+                            <tr key={art.id || index}>
+                                <td>{art.codeLot}</td>
+                                <td>{art.designation}</td>
+                                <td>{art.immo}</td>
+                                <td className="text-end">{fmt(art.prixUnitaire || 0)} </td>
+                                <td className="text-end">{art.quantite || 0}</td>
+                                <td className="text-end font-monospace-bold">{fmt(art.puAriary)} Ar</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                    
+                </table>
+
+                <div className="signature-section">
+                   
+                    <div className="sign-box text-end">
+                        
+                        {statut !== "En cours" && <span className="sign-statut-text text-end">Dossier {statut} le {new Date().toLocaleDateString()}</span>}
+                    </div>
+                </div>
+            </div>
+
+            {userRole === "Demandeur" && (
+                <div className="text-end mt-4 no-print">
+                    <button className="btn btn-secondary me-2" onClick={onRetour}>
+                        Modifier les saisies
+                    </button>
+                    <button className="btn btn-success" onClick={handleEnvoyerOfficiel}>
+                        🚀 Envoyer définitivement
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+}
