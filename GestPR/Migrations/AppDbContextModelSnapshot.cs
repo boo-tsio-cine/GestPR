@@ -43,6 +43,9 @@ namespace GestPR.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<decimal>("PrixDeRevient")
+                        .HasColumnType("decimal(18,4)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("DemandeId");
@@ -57,6 +60,10 @@ namespace GestPR.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Commentaire")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
 
                     b.Property<DateTime>("DateTime")
                         .HasColumnType("datetime2");
@@ -210,6 +217,10 @@ namespace GestPR.Migrations
                         .HasColumnType("bit");
 
                     b.Property<string>("Role")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Site")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 

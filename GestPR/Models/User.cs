@@ -8,6 +8,7 @@ namespace GestPR.Models
 
         public string AdUsername { get; set; }
         public string Role { get; set; }
+        public string Site { get; set; }
         public bool IsActive { get; set; }
     }
 }

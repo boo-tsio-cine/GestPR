@@ -161,17 +161,19 @@ namespace GestPR
                 app.UseExceptionHandler("/Error");
                 app.UseHsts();
             }
-
+         
             app.UseCors("AllowFrontend");
             app.UseStaticFiles();
             app.UseRouting();
+            // Permet d'accéder aux fichiers du dossier wwwroot via HTTP (Ex: http://localhost:5000/uploads/pdfs/mon-fichier.pdf)
+            app.UseStaticFiles();
 
             // L'authentification doit TOUJOURS être placée AVANT l'autorisation
             app.UseAuthentication();
             app.UseAuthorization();
 
             app.MapControllers();
-            app.MapRazorPages();
+            app.MapFallbackToFile("index.html");
 
             app.Run();
         }

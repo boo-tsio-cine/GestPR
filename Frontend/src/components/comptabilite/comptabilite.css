@@ -1,15 +1,24 @@
 .navbar{
-    position: relative;
-    z-index:1000;
+    position: sticky;
     top: 0;
+    z-index: 1000;
+}
+
+/* En-tête des filtres : reste fixe sous la Nav lors du scroll */
+.compta-filtre-header{
+    position: sticky;
+    top: 5rem;               /* hauteur de la Nav */
+    z-index: 900;
+    background: #fff;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
 }
 
 .card{
-    position: relative;
+    position: relative ;
     padding: 2rem;
-    margin-top: 10rem;
-    margin-left: 5rem;
-    margin-right: 5rem;
+    margin: 7rem 5rem 5rem;
+    border-radius:1.5rem;
+    box-shadow: rgba(184, 179, 179, 0.952) 0px 14px 28px, rgba(255, 241, 241, 0.733) 0px 10px 10px;
 }
 
 .card-dem{
@@ -26,6 +35,7 @@
 
 .navfiltre{
     z-index: 0;
+    background-color: rgb(253, 241, 241);
 }
 
 .card-head{
@@ -55,3 +65,15 @@
     margin-top: 1rem;
     
 }
+
+.compta{
+    /* background-image: url('/fonds/login2.avif'); */
+    background: linear-gradient( 360deg, rgba(2, 2, 2, 0.7)), url('/fonds/copta.avif');
+    background-repeat: no-repeat;
+    background-size: cover;
+    width: 100%;
+    height: 100vh;
+    position: fixed;
+    top: 0; 
+}
+

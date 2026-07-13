@@ -21,6 +21,9 @@ function Welcome() {
     <div className="welcome" >
       <div className="d-flex min-vh-100 align-items-center justify-content-center text-center">
         <div className="card p-5 shadow-sm" style={{ maxWidth: "500px", borderRadius: "15px" }}>
+          <div className="image_welcome">
+            <img src="/image/R.jfif" alt="logo_star" srcset="" />
+          </div>
           <h1 className="display-5 fw-bold text-danger mb-3">Bienvenue,</h1>
           
           <p className="lead text-muted mb-4">
@@ -28,7 +31,7 @@ function Welcome() {
           </p>
           
           <p className="text-secondary small mb-4">
-            Votre session Windows a été identifiée avec succès. Vous êtes connecté en tant que <strong>{userRole || "Utilisateur sans rôle déterminé"}</strong>.
+            Votre session Windows a été identifiée avec succès. Vous êtes connecté en tant que <strong style={{color:"rgb(12, 151, 12)"}}>{userRole || "Utilisateur sans rôle déterminé"}</strong>.
           </p>
           
           {userRole ? (

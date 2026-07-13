@@ -194,6 +194,12 @@ export default function Valid() {
 
                         <div className="mb-2">
                             <label className="form-label fw-bold">Motif / Commentaire</label>
+                            {selectedDemande.commentaire && (
+                                <div className="mb-2 p-2 border rounded bg-light">
+                                    <small className="text-muted fw-bold d-block">Commentaire :</small>
+                                    <div style={{ whiteSpace: "pre-wrap" }}>{selectedDemande.commentaire}</div>
+                                </div>
+                            )}
                             <textarea 
                                 className="form-control"
                                 rows="3"

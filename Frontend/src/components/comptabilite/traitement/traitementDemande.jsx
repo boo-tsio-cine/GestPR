@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom"
-import { demandeService, frsService, origineService } from "../../../services/api";
+import { demandeService, frsService, userService } from "../../../services/api";
 import { toast } from "sonner";
 import Nav from "../../nav/nav";
 import "./traitement.css";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import PageApercuDemande from "./PageApercuDemande";
+import paysData from '../../../data/pays.json';
 
 const taux_assurance = 0.2 ;
 
@@ -24,7 +25,6 @@ function emptyDossierData(){
         fretTotal : "" , 
         
         deboursTransit : "",
-        remunerationTransit : "",
         deboursMagasinage : "",
         transportLocal : "",
         commissionRemun : "",
@@ -57,7 +57,7 @@ function emptyArticleSaisie(){
 function calcMontant(prixUnitaire, quantite) {
     const pu = parseFloat(prixUnitaire) || 0;
     const qte = parseFloat(quantite) || 0;
-    return pu * qte;
+    return pu / qte;
 }
 
 
@@ -87,12 +87,16 @@ function calcPartProrata(montantGlobal, proportion) {
 // ─────────────────────────────────────────────────────────────────────────
 // Formatage d'affichage
 // ─────────────────────────────────────────────────────────────────────────
-function fmt(n, decimals = 2) {
+function fmt(n, decimals = 4) {
   if (!isFinite(n)) return "0";
   return n.toLocaleString("fr-FR", {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   });
+}
+
+function round4(v) {
+  return Math.round((parseFloat(v) || 0) * 10000) / 10000;
 }
  
 
@@ -102,6 +106,7 @@ export function TraitementDemande(){
     const [loading, setLoading] = useState(true);
     const [demandeId, setDemandeId] = useState(id);
     const [demandes, setDemandes] = useState(null);
+    const [commentaire, setCommentaire] = useState("");
 
     // données globales du dossier (saisies une seule fois)
     const [dossierData, setDossierData] = useState(emptyDossierData());
@@ -117,24 +122,47 @@ export function TraitementDemande(){
     
     const [error, setError] = useState(null); 
 
-    const [origine, setOrigine] = useState([]);   
     const [frs, setFrs] = useState([]);   
+
+    const [designationSelectionnee, setDesignationSelectionnee] = useState(null);
+    const [historiqueArticles, setHistoriqueArticles] = useState([]);
+    const [loadingHist, setLoadingHist] = useState(false);
 
     const fetchDemandes = async () => {
 
         setLoading(true);
 
         try {
-            const res = await demandeService.getDemande(id);
+            const [res, utilisateursRes] = await Promise.all([
+                demandeService.getDemande(id),
+                userService.getAll(),
+            ]);
             const d = res.data ;
 
             if(!d) throw new Error("Aucune donnée reçue");
+
+            const listeUtilisateurs = utilisateursRes.data || [];
+            const demandeurId = d.demandeurId ?? d.DemandeurId;
+            const utilisateurTrouve = listeUtilisateurs.find(
+                (u) => (u.id ?? u.Id) === demandeurId
+            );
     
             const demandesFormatees ={
                 id : d.id ?? d.Id,
                 motif: d.motif ?? d.Motif ?? "",
                 status: d.status ?? d.Status ?? "Nouvelle",
                 date: d.dateTime ?? d.DateTime,
+                site: utilisateurTrouve ? (utilisateurTrouve.site || utilisateurTrouve.Site || "") : "",
+                demandeurId: demandeurId,
+                nomDemandeur: utilisateurTrouve
+                    ? (utilisateurTrouve.nom || utilisateurTrouve.Nom || utilisateurTrouve.username)
+                    : `Utilisateur N°${demandeurId}`,
+                prenomDemandeur: utilisateurTrouve
+                    ? (utilisateurTrouve.prenom || utilisateurTrouve.Prenom || utilisateurTrouve.lastname)
+                    : `Utilisateur N°${demandeurId}`,
+                matricule: utilisateurTrouve
+                    ? (utilisateurTrouve.matricule || utilisateurTrouve.Matricule)
+                    : `Utilisateur N°${demandeurId}`,
                 // d.articles correspond à votre "List<ArticleResponseDto> Articles" côté C#
                 lots: (d.articles ?? d.Articles ?? []).map((a) => ({
                     id: a.id ?? a.Id ?? 0,  
@@ -182,46 +210,117 @@ export function TraitementDemande(){
         }));
     };
 
+    const voirHistorique = async (designation) => {
+        setDesignationSelectionnee(designation);
+        setLoadingHist(true);
+        try {
+            const response = await demandeService.getHistoriqueByDesignation(designation);
+            setHistoriqueArticles(response.data);
+        } catch (err) {
+            toast.error("Impossible de charger l'historique de cet article");
+        } finally {
+            setLoadingHist(false);
+        }
+    };
+
     // if (loading) return <div className="container mt-5">Chargement de la demande...</div>;s
 
+    const valeurCAF = useMemo(() => {
+        const fob = parseFloat(dossierData.fobTotal) || 0;
+        const mfob = parseFloat(dossierData.mfobTotal) || 0;
+        const fret = parseFloat(dossierData.fretTotal) || 0;
+        const assurance = ((fob + mfob + fret) * taux_assurance) / 100;
+        const valcaf = fob + mfob + fret + assurance;
+        return round4(valcaf * (parseFloat(dossierData.cours) || 0));
+    }, [dossierData.fobTotal, dossierData.mfobTotal, dossierData.fretTotal]);
 
     // CalculefraisApprocheTotal = () => {
-    const fraisApprocheTotalCalcule = useMemo(() => {
-        const clesFrais = ["deboursTransit", "remunerationTransit", "deboursMagasinage", "transportLocal", "commissionRemun", "commissionBancaires", "douanes", "prestationGasyNet", "apmf","ddp", "controleRadioactive", "autresDat"
+    const detailFraisApproche = useMemo(() => {
+        const tc = parseFloat(dossierData.tc) || 0;
+        const clesFrais = ["deboursMagasinage", "commissionBancaires", "prestationGasyNet", "apmf","ddp", "controleRadioactive", "autresDat"
         ];
         
+        const deboursTransitTranslate = parseFloat(dossierData.deboursTransit * dossierData.cours) || 0;
+        const commissionRemunTranslate = parseFloat(dossierData.commissionRemun * valeurCAF /100) || 0;
+        const commissionBancairesTranslate = parseFloat(dossierData.commissionBancaires * valeurCAF) || 0;
+        const douanesTranslate = parseFloat(dossierData.douanes * valeurCAF /100) || 0;
+        const prestationGasyNetTranslate = parseFloat(dossierData.prestationGasyNet) || 0;
+        const transportLocalTranslate = parseFloat(dossierData.transportLocal) || 0;
+        const transportLocalTotal = transportLocalTranslate * tc;
         const maritimeFret = parseFloat(dossierData.fretTotal * dossierData.cours) || 0;
         const maritimeMfob = parseFloat(dossierData.mfobTotal * dossierData.cours) || 0;
         const totalAutresFrais = clesFrais.reduce((total, cle) => {
             const valeur = parseFloat(dossierData[cle]) || 0;
             return total + valeur;
-        }, 0);
+        }, 0) + transportLocalTotal;
+
+        const pourcentdeboursTransit = valeurCAF ? parseFloat(dossierData.deboursTransit * dossierData.cours * (parseFloat(dossierData.tc) || 0) / valeurCAF *100) : 0;
+        const pourcentTransport = valeurCAF ? parseFloat(transportLocalTranslate/valeurCAF * 100) : 0;
+        const pourcentcommissionRemun = valeurCAF ? parseFloat(commissionRemunTranslate/valeurCAF * 100) : 0;
+        const pourcentcommissionBancaire = valeurCAF ? parseFloat(dossierData.commissionBancaires/valeurCAF * 100) : 0;
+        const pourcentdouanes = valeurCAF ? parseFloat(douanesTranslate/valeurCAF * 100) : 0;
+        const pourcentprestationGasyNet = valeurCAF ? parseFloat(prestationGasyNetTranslate/valeurCAF * 100) : 0;
         
-        return maritimeFret + maritimeMfob + totalAutresFrais;
-    }, [dossierData]);
+        const total = round4(maritimeFret + maritimeMfob + totalAutresFrais + deboursTransitTranslate + commissionRemunTranslate + douanesTranslate);
 
-    // ── Calculs dérivés (recalculés à chaque changement) ────────────────
- 
+        return {
+            deboursTransitTranslate,
+            commissionRemunTranslate,
+            commissionBancairesTranslate,
+            douanesTranslate,
+            prestationGasyNetTranslate,
+            transportLocalTranslate,
+            maritimeFret,
+            maritimeMfob,
+            totalAutresFrais,
+            total,
+            pourcentdeboursTransit,
+            pourcentTransport,
+            pourcentcommissionRemun,
+            pourcentcommissionBancaire,
+            pourcentdouanes,
+            pourcentprestationGasyNet,
+        };
+    }, [dossierData, valeurCAF]);
+
+    const fraisApprocheTotalCalcule = detailFraisApproche.total;
+
+    const fmtPct = (v) => (parseFloat(v) || 0).toLocaleString("fr-FR", {
+        minimumFractionDigits: 4,
+        maximumFractionDigits: 4,
+    });
+
+  // ── Calculs dérivés (recalculés à chaque changement) ────────────────
+
+  // Pour le type "Canettes", chaque lot est scindé en 2 lignes (Canette 1 / Canette 2)
+  // identiques en calcul. Les autres types produisent une seule ligne par lot.
+  const isCanettes = dossierData.typeDossier === "Canettes";
+
+  const lignes = useMemo(() => {
+    if (!demandes) return [];
+    if (isCanettes) {
+      return demandes.lots.flatMap((lot) => [
+        { rowKey: `${lot.id}#0`, lot, label: "Couvercle" },
+        { rowKey: `${lot.id}#1`, lot, label: "Boîte" },
+      ]);
+    }
+    return demandes.lots.map((lot) => ({ rowKey: lot.id, lot, label: "" }));
+  }, [demandes, isCanettes]);
+  
   const montantTotalDossier = useMemo(() => {
-    if (!demandes) return 0;
-    const lots = demandes.lots.map((lot) => saisies[lot.id] || emptyArticleSaisie());
-    return calcMontantTotalDossier(lots);
-  }, [demandes, saisies]);
+    return lignes.reduce((total, { rowKey }) => {
+      const s = saisies[rowKey] || emptyArticleSaisie();
+      return total + calcMontant(s.prixUnitaire, s.quantite);
+    }, 0);
+  }, [lignes, saisies]);
  
 
-  const valeurCAF = useMemo(() => {
-    const fob = parseFloat(dossierData.fobTotal) || 0;
-    const mfob = parseFloat(dossierData.mfobTotal) || 0;
-    const fret = parseFloat(dossierData.fretTotal) || 0;
-    const assurance = ((fob + mfob + fret) * taux_assurance) / 100;
-    const valcaf = fob + mfob + fret + assurance;
-    return valcaf * (parseFloat(dossierData.cours) || 0);
-  }, [dossierData.fobTotal, dossierData.mfobTotal, dossierData.fretTotal]);
+
 
   const total = useMemo(() => {
     const mfob = parseFloat(dossierData.mfobTotal) || 0;
     const fret = parseFloat(dossierData.fretTotal) || 0;
-    return valeurCAF + fraisApprocheTotalCalcule - ((mfob + fret) * (parseFloat(dossierData.cours) || 0));
+    return round4(valeurCAF + fraisApprocheTotalCalcule - ((mfob + fret) * (parseFloat(dossierData.cours) || 0)));
   }, [valeurCAF, fraisApprocheTotalCalcule, dossierData.mfobTotal, dossierData.fretTotal]);
 
   const resultatsParArticle = useMemo(() => {
@@ -229,13 +328,13 @@ export function TraitementDemande(){
     const resultats = {};
 
     //1. D'abord, on calcule le totalPu de TOUS les articles saisis
-    const totalPuSaisi = demandes.lots.reduce((sum, lot) => {
-      const saisie = saisies[lot.id] || emptyArticleSaisie();
+    const totalPuSaisi = lignes.reduce((sum, { rowKey }) => {
+      const saisie = saisies[rowKey] || emptyArticleSaisie();
       return sum + (parseFloat(saisie.prixUnitaire) || 0);
     }, 0);
 
-    demandes.lots.forEach((lot) => {
-      const saisie = saisies[lot.id] || emptyArticleSaisie();
+    lignes.forEach(({ rowKey, lot }) => {
+      const saisie = saisies[rowKey] || emptyArticleSaisie();
       
       const base = calculerArticle(
         { ...lot, prixUnitaire: saisie.prixUnitaire, quantite: saisie.quantite },
@@ -246,27 +345,27 @@ export function TraitementDemande(){
       // Ta formule exacte : (PU * TotalGénéralAr) / (TotalPuSaisi * Quantité)
       const puSaisi = parseFloat(saisie.prixUnitaire) || 0;
       const qteSaisie = parseFloat(saisie.quantite) || 0;
-   
+    
       const puAriaryCalcule = (totalPuSaisi > 0 && qteSaisie > 0) ? (puSaisi * total) / (totalPuSaisi * qteSaisie) : 0;
 
 
-      resultats[lot.id] = {
+      resultats[rowKey] = {
         ...base,
         puAriary: puAriaryCalcule,
       };
     });
     return resultats;
-  }, [demandes, saisies, dossierData, montantTotalDossier, total, fraisApprocheTotalCalcule]);
+  }, [demandes, lignes, saisies, dossierData, montantTotalDossier, total, fraisApprocheTotalCalcule]);
  
   // Totaux généraux (pour vérification / affichage en bas de tableau)
   const totaux = useMemo(() => {
     const valeurs = Object.values(resultatsParArticle);
 
     // Somme des pu saisi par l'user
-    const totalPu = demandes ? demandes.lots.reduce((s, lot) => {
-        const pu = parseFloat(saisies[lot.id]?.prixUnitaire) || 0;
+    const totalPu = lignes.reduce((s, { rowKey }) => {
+        const pu = parseFloat(saisies[rowKey]?.prixUnitaire) || 0;
         return s + pu;
-    }, 0) : 0;
+    }, 0);
 
     return {
         totalPu,
@@ -275,7 +374,7 @@ export function TraitementDemande(){
         assurance: valeurs.reduce((s, v) => s + v.assurance, 0),
         coutTotalAr: valeurs.reduce((s, v) => s + v.coutTotalAr, 0),
     };
-  }, [resultatsParArticle, demandes, saisies]);
+  }, [resultatsParArticle, lignes, saisies]);
  
 
 
@@ -292,7 +391,7 @@ function calculerArticle(lot, dossierData, montantTotalDossier) {
   const cfr = partCout + partMfob + partFret;
  
   // Assurance 0,2% sur le CFR de l'article
-  const assurance = (cfr * taux_assurance) / 100;
+  const assurance = round4((cfr * taux_assurance) / 100);
  
   // Part des frais d'approche du dossier (déjà en Ariary)
   const partFraisApproche = calcPartProrata(
@@ -336,8 +435,8 @@ function calculerArticle(lot, dossierData, montantTotalDossier) {
   e.preventDefault();
 
   // 1. Vérification que tous les champs obligatoires du tableau sont remplis
-  const lignesIncompletes = demandes.lots.filter((lot) => {
-    const s = saisies[lot.id];
+  const lignesIncompletes = lignes.filter(({ rowKey }) => {
+    const s = saisies[rowKey];
     return !s?.prixUnitaire || !s?.quantite;
   });
 
@@ -346,37 +445,12 @@ function calculerArticle(lot, dossierData, montantTotalDossier) {
     return;
   }
 
-   if (lignesIncompletes.length > 0) {
-    toast.error("Veuillez remplir le prix unitaire et la quantité pour chaque article");
-    return;
-  }
-
   // 2. Pas d'appel API ici ! On stocke temporairement l'ID et on affiche l'aperçu
   setIdDemandeGenere(id);
-  setAfficherApercu(true);
+   setAfficherApercu(true);
 };
 
-// Fonction de génération et mise en page du PDF regroupé
-
-
-  const fetchOrigine = async () => {
-     try{
-        setLoading(true);
-        setError(null);
-        const response = await origineService.getAll();
-        setOrigine(response.data);
-    }catch(err){
-        setError(err.message || "Erreur de chargement")
-    }finally{
-        setLoading(false);
-    }
-  }
-    useEffect(()=>{
-        fetchOrigine();
-    }, [])
-    
-
-     const fetchFrs = async () => {
+   const fetchFrs = async () => {
      try{
         setLoading(true);
         setError(null);
@@ -394,17 +468,15 @@ function calculerArticle(lot, dossierData, montantTotalDossier) {
 
 
     if (afficherApercu) {
-        // Transformer l'objet resultatsParArticle en tableau pour l'aperçu
-        const articlesFormates = demandes.lots.map(lot => ({
-            id: lot.id,
+        const articlesFormates = lignes.map(({ rowKey, lot }) => ({
+            id: rowKey,
             designation: lot.designation,
             codeLot: lot.codeLot,
-            prixUnitaire: saisies[lot.id]?.prixUnitaire || 0,
-            quantite: saisies[lot.id]?.quantite || 0,
-            immo: saisies[lot.id]?.immo || "",
-            // On passe les données calculées en temps réel
-            partFraisApproche: resultatsParArticle[lot.id]?.partFraisApproche || 0,
-            puAriary: resultatsParArticle[lot.id]?.puAriary || 0
+            prixUnitaire: saisies[rowKey]?.prixUnitaire || 0,
+            quantite: saisies[rowKey]?.quantite || 0,
+            immo: saisies[rowKey]?.immo || "",
+            partFraisApproche: resultatsParArticle[rowKey]?.partFraisApproche || 0,
+            puAriary: resultatsParArticle[rowKey]?.puAriary || 0
         }));
 
         return (
@@ -412,86 +484,28 @@ function calculerArticle(lot, dossierData, montantTotalDossier) {
                 idDemande={idDemandeGenere} 
                 userRole="Demandeur" 
                 onRetour={() => setAfficherApercu(false)} 
-                // 💡 On injecte directement les vraies données saisies et calculées !
                 donneesInitiales={{
                     dossierData: {
                         ...dossierData,
                         fraisApprocheTotal: fraisApprocheTotalCalcule 
                     },
+                    detailFraisApproche,
+                    total,
+                    valeurCAF,
+                    fraisApprocheTotalCalcule,
                     articles: articlesFormates,
-                    statut: demandes.status
+                    statut: demandes.status,
+                    site: demandes.site,
+                    nomDemandeur: demandes.nomDemandeur,
+                    prenomDemandeur: demandes.prenomDemandeur,
+                    matricule: demandes.matricule,
+                    commentaire: commentaire,
+                    tauxAssurance: taux_assurance,
                 }}
             />
         );
     }
-// const genererPDF = () => {
-  
-//     const doc = new jsPDF({
-//         orientation:"portrait",
-//         unit:"mm",
-//         format:"a4",
-//     });
 
-//     const margeGauche = 20;
-//     let yPosition = 20;
-
-//     doc.setFont("helvetica", "normal");
-
-//     // ─── SECTION 1 : EN-TÊTE (Ex: Logo, Nom entreprise) ───
-//     doc.setFontSize(20);
-//     doc.setFont("helvetica", "bold");
-//     doc.text("Nom de l'entreprise", margeGauche, yPosition);
-//     yPosition += 10;
-
-//     doc.setFontSize(12);
-//     doc.setFont("helvetica", "normal");
-//     doc.text("Adresse, Ville, Pays | Contact : email@domain.com", margeGauche, yPosition);
-
-//     // ─── LIGNE DE SÉPARATION GRAPHIQUE ───
-//     yPosition += 5;
-//     doc.setDrawColor(200, 200, 200);
-//     doc.line(margeGauche, yPosition, 190, yPosition);
-
-//   // ─── SECTION 2 : TITRE DU DOCUMENT ───
-//     yPosition += 15;
-//     doc.setFontSize(16);
-//     doc.setFont("helvetica", "bold");
-//     doc.text("TITRE DU DOCUMENT", margeGauche, yPosition);  
-
-//     // ─── SECTION 3 : LE CONTENU (À personnaliser) ───
-//     yPosition += 12;
-//     doc.setFontSize(11);
-//     doc.setFont("helvetica", "normal");
-
-//     // Exemple de texte dynamique ou statique
-//     doc.text(`Référence : REF-2026-001`, margeGauche, yPosition);
-//     yPosition += 7;
-//     doc.text(`Date : ${new Date().toLocaleDateString()}`, margeGauche, yPosition);
-
-//     yPosition += 15;
-//     // Bloc de texte long ou paragraphes
-//     const paragraphe = "<h1>Titre de l'article</h1><p>Contenu de l'article...</p>";
-
-//     // splitTextToSize permet de couper automatiquement le texte pour qu'il ne dépasse pas de la page
-//     const texteFormate = doc.splitTextToSize(paragraphe, 170);
-//     doc.text(texteFormate, margeGauche, yPosition);
-
-//     // ─── SECTION 4 : PIED DE PAGE ───
-//   // On force la position tout en bas de la page A4 (Hauteur totale ~297mm)
-//     const positionBasDePage = 280;
-//     doc.setFontSize(9);
-//     doc.setTextColor(120, 120, 120);
-//     doc.text("Page 1 sur 1 — Document généré automatiquement.", margeGauche, positionBasDePage);
-
-//     // 5. TÉLÉCHARGEMENT DU FICHIER
-//     doc.save("mon-document-personnalise.pdf");
-
-// };
-
-   // ─────────────────────────────────────────────────────────────────────
-  // Rendu
-  // ─────────────────────────────────────────────────────────────────────
- 
     if (loading) {
         return (
         <>
@@ -519,23 +533,23 @@ function calculerArticle(lot, dossierData, montantTotalDossier) {
 
     const STATUS_STYLES = {
     "Nouvelle": {
-        backgroundColor: "#E0F2FE", // Bleu pastel très doux
-        color: "#0369A1",           // Texte bleu foncé
+        backgroundColor: "#a9caf5",
+        color: "#000927",
         borderColor: "#BAE6FD"
     },
     "En attente": {
-        backgroundColor: "#FEF9C3", // Jaune pastel (ton choix - parfait)
-        color: "#854D0E",           // Texte marron/doré foncé
+        backgroundColor: "#FEF9C3",
+        color: "#854D0E",
         borderColor: "#FEF08A"
     },
     "Validée": {
-        backgroundColor: "#DCFCE7", // Vert pastel (ton choix - parfait)
-        color: "#166534",           // Texte vert foncé
+        backgroundColor: "#DCFCE7",
+        color: "#166534",
         borderColor: "#BBF7D0"
     },
     "Refusée": {
-        backgroundColor: "#FFE4E6", // Rouge/Rose pastel (ton choix - parfait)
-        color: "#9F1239",           // Texte rouge foncé
+        backgroundColor: "#FFE4E6",
+        color: "#9F1239",
         borderColor: "#FECDD3"
     }
 };
@@ -548,7 +562,7 @@ const STYLE_PAR_DEFAUT = { backgroundColor: "#F3F4F6", color: "#374151", borderC
             <h2 className="traiter-title">Traitement de la Demande N° {String(id).padStart(3, '0')}</h2>
             <div className=" traiter-page ">
                 <p><strong>Date de création :</strong> {demandes.date ? new Date(demandes.date).toLocaleDateString('fr-FR') : "Inconnue"}</p>
-                <p>
+                {/* <p>
                     {
                         demandes.motif !== "En attente" && (
                             <span className="badge bg-warning text-dark">
@@ -556,11 +570,19 @@ const STYLE_PAR_DEFAUT = { backgroundColor: "#F3F4F6", color: "#374151", borderC
                             </span>
                         )
                     }
-                </p>
+                </p> */}
                 <p><strong>Statut actuel :</strong> <span style={{
                     backgroundColor: demandes.status === "Nouvelle" ? "#a9caf5" : demandes.status === "En attente" ? "#FEF9C3" : demandes.status === "Validée" ? "#DCFCE7" : "#FFE4E6",
                     color: demandes.status === "Nouvelle" ? "#000927" : demandes.status === "En attente" ? "#854D0E" : demandes.status === "Validée" ? "#166534" : "#9F1239",
                 }}>{demandes.status}</span></p>
+
+                <div className="row ">
+                    
+                    <p><strong>Demandeur :</strong> {demandes.nomDemandeur} {demandes.prenomDemandeur}</p>
+                    <p><strong>Matricule :</strong> {demandes.matricule}</p>
+                    <p><strong>Site :</strong> {demandes.site || "Non défini"}</p>
+                
+                </div>
 
                 <form action="" onSubmit={handleSubmit} method="post">
                     {/* ── Données globales du dossier ─────────────────────────── */}
@@ -572,10 +594,12 @@ const STYLE_PAR_DEFAUT = { backgroundColor: "#F3F4F6", color: "#374151", borderC
                                  
                                  <select name="typeDossier" id="" className="form-control" value={dossierData.typeDossier} onChange={(e) => updateDossierField("typeDossier", e.target.value)}>
                                      <option value="">Sélectionner le type</option>
-                                     <option value="Groupage">Groupage</option>
-                                     <option value="Malte">Malte</option>
-                                     <option value="Sucre">Sucre</option>
-                                 </select>
+                                      <option value="Groupage">Groupage</option>
+                                      <option value="Malte">Malte</option>
+                                      <option value="Sucre">Sucre</option>
+                                      <option value="Canettes">Canettes</option>
+                                      <option value="Aériens">Aériens</option>
+                                  </select>
                              </div>
                              <div className="col-md-4">
                                  <label htmlFor="" className="form-label">Nombre TC</label>
@@ -590,21 +614,19 @@ const STYLE_PAR_DEFAUT = { backgroundColor: "#F3F4F6", color: "#374151", borderC
                                     />
                              </div>
 
-                             <div className="col-md-4">
-                                 <label htmlFor="" className="form-label">Origine</label>
+                              <div className="col-md-4">
+                                  <label htmlFor="" className="form-label">Origine</label>
 
-                                 
-                                 <select name="origine" id="" className="form-control" value={dossierData.origine || ""} onChange={(e) => updateDossierField("origine", e.target.value)} disabled={loading}>
-                                     <option value="">
-                                         {loading ? "Chargement des origines..." : "Sélectionner l'origine"}
-                                     </option>
-                                     {!loading && origine && origine.map((orig) => (
-                                         <option key={orig.id || orig.Id} value={orig.pays || orig.Pays || orig}>
-                                             {orig.pays || orig.Pays || orig}
-                                         </option>
-                                     ))}
-                                 </select>
-                             </div>
+                                  
+                                  <select name="origine" id="" className="form-control" value={dossierData.origine || ""} onChange={(e) => updateDossierField("origine", e.target.value)}>
+                                      <option value="">Sélectionner l'origine</option>
+                                      {paysData.map((pays) => (
+                                          <option key={pays.code} value={pays.nom}>
+                                              {pays.drapeau} {pays.nom}
+                                          </option>
+                                      ))}
+                                  </select>
+                              </div>
 
                                <div className="col-md-4">
                                  <label htmlFor="" className="form-label">Fournisseur</label>
@@ -649,148 +671,137 @@ const STYLE_PAR_DEFAUT = { backgroundColor: "#F3F4F6", color: "#374151", borderC
                          </div>
                      </div>
 
-<div className=" card mt-3 p-4">
+                    <div className=" card mt-3 p-4">
 
                         <h4>Données générales du dossier</h4>
                         <div className="row g-3">
 
-                            <div className="col-md-2">
+                            <div className="col-md-4">
                                 <label htmlFor="" className="form-label">Cours de change (Ar)</label>
 
-                                <input
-                                    type="number"
+                                <input type="number"
                                     step="0.01"
                                     className="form-control"
                                     value={dossierData.cours}
                                     onChange={(e) => updateDossierField("cours", e.target.value)}
                                     required
-                                    />
-                                </div>
-                                <div className="col-md-2">
-                                    <label className="form-label">FOB total (devise)</label>
-                                    <input
-                                    type="number"
+                                />
+                            </div>
+                            <div className="col-md-4">
+                                <label className="form-label">FOB total (devise)</label>
+                                <input  type="number"
                                     step="0.01"
                                     className="form-control"
                                     value={dossierData.fobTotal}
                                     onChange={(e) => updateDossierField("fobTotal", e.target.value)}
                                     required
-                                    />
-                                </div>
-                                <div className="col-md-2">
-                                    <label className="form-label">MFOB total (devise)</label>
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        className="form-control"
-                                        value={dossierData.mfobTotal}
-                                        onChange={(e) => updateDossierField("mfobTotal", e.target.value)}
-                                        required
-                                    />
-                                </div>
-                                <div className="col-md-2">
-                                    <label className="form-label">Fret total (devise)</label>
-                                    <input
-                                    type="number"
+                                />
+                            </div>
+                            <div className="col-md-4">
+                                <label className="form-label">MFOB total (devise)</label>
+                                <input type="number"
+                                    step="0.01"
+                                    className="form-control"
+                                    value={dossierData.mfobTotal}
+                                    onChange={(e) => updateDossierField("mfobTotal", e.target.value)}
+                                    required
+                                />
+                            </div>
+                            <div className="col-md-4">
+                                <label className="form-label">Fret total (devise)</label>
+                                <input type="number"
                                     step="0.01"
                                     className="form-control"
                                     value={dossierData.fretTotal}
                                     onChange={(e) => updateDossierField("fretTotal", e.target.value)}
-                                    required
-                                    />
-                                </div>
-                                <div className="col-md-4">
-                                    <label className="form-label">
-                                        Valeur CAF totale (Ar)
-                                        <small className="text-muted"> — (FOB + MFOB + Fret) + Assurance</small>
-                                    </label>
-                                    <input
-                                    type="number"
+                                required
+                                />
+                            </div>
+                            <div className="col-md-4"></div>
+                            <div className="col-md-4"></div>
+                            <div className="col-md-4">
+                                <label className="form-label">
+                                    Valeur CAF totale (Ar)
+                                        
+                                </label>
+                                <input type="number"
                                     step="0.01"
                                     className="form-control"
                                     value={valeurCAF}
                                     readOnly
-                                    />
-                                </div>
-                                <div className="col-md-4">
-                                    <label className="form-label">
-                                    Frais d'approche totaux (Ar)
-                                    <small className="text-muted"> — douane, GasyNet, transit, transport...</small>
-                                    </label>
-                                    <input
-                                    type="number"
+                                />
+                            </div>
+                            <div className="col-md-4">
+                                <label className="form-label">
+                                Frais d'approche totaux (Ar)
+                                
+                                </label>
+                                <input type="number"
                                     step="0.01"
                                     className="form-control"
                                     value={fraisApprocheTotalCalcule}
                                     readOnly
-                                    />
-                                </div>
-                                <div className="col-md-4">
-                                    <label className="form-label">
-                                        Total général (Ar)
-                                        <small className="text-muted"> — Valeur CAF + Frais d'approche</small>
-                                    </label>
-                                    <input
-                                    type="number"
+                                />
+                            </div>
+                            <div className="col-md-4">
+                                <label className="form-label">
+                                    Total général (Ar)
+                                </label>
+                                <input type="number"
                                     step="0.01"
                                     className="form-control"
                                     value={total}
                                     readOnly
-                                    />
-                                </div>
+                                />
+                            </div>
                         </div>
                     </div>
 
-                    {/* ── Détail des frais d'approche ─────────────────────────────── */}
                     <div className="card mt-3 p-4">
-                        <h4>Détail des frais d'approche (Ariary)</h4>
+                        <h4>Détail des frais d'approche</h4>
                         <div className="row g-3">
                             <div className="col-md-4">
-                                <label className="form-label">Débours Transit</label>
+                                <label className="form-label">Frais à l'arrivée par TC <small className="text-muted fw-normal">(€ / devise)</small></label>
                                 <input type="number" step="0.01" className="form-control" value={dossierData.deboursTransit} onChange={(e) => updateDossierField("deboursTransit", e.target.value)} />
                             </div>
                             <div className="col-md-4">
-                                <label className="form-label">Rémunération Transit</label>
-                                <input type="number" step="0.01" className="form-control" value={dossierData.remunerationTransit} onChange={(e) => updateDossierField("remunerationTransit", e.target.value)} />
-                            </div>
-                            <div className="col-md-4">
-                                <label className="form-label">Débours Magasinage</label>
+                                <label className="form-label">Débours Magasinage <small className="text-muted fw-normal">(Ar)</small></label>
                                 <input type="number" step="0.01" className="form-control" value={dossierData.deboursMagasinage} onChange={(e) => updateDossierField("deboursMagasinage", e.target.value)} />
                             </div>
                             <div className="col-md-4">
-                                <label className="form-label">Transport Local</label>
+                                <label className="form-label">Transport Local <small className="text-muted fw-normal">(Ar)</small></label>
                                 <input type="number" step="0.01" className="form-control" value={dossierData.transportLocal} onChange={(e) => updateDossierField("transportLocal", e.target.value)} />
                             </div>
                             <div className="col-md-4">
-                                <label className="form-label">Commission Rémun</label>
+                                <label className="form-label">Commission SACOFRINA <small className="text-muted fw-normal">(%)</small></label>
                                 <input type="number" step="0.01" className="form-control" value={dossierData.commissionRemun} onChange={(e) => updateDossierField("commissionRemun", e.target.value)} />
                             </div>
                             <div className="col-md-4">
-                                <label className="form-label">Commission Bancaires</label>
+                                <label className="form-label">Commission Bancaires <small className="text-muted fw-normal">(Ar)</small></label>
                                 <input type="number" step="0.01" className="form-control" value={dossierData.commissionBancaires} onChange={(e) => updateDossierField("commissionBancaires", e.target.value)} />
                             </div>
                             <div className="col-md-4">
-                                <label className="form-label">Douanes</label>
+                                <label className="form-label">Douanes <small className="text-muted fw-normal">(%)</small></label>
                                 <input type="number" step="0.01" className="form-control" value={dossierData.douanes} onChange={(e) => updateDossierField("douanes", e.target.value)} />
                             </div>
                             <div className="col-md-4">
-                                <label className="form-label">Prestation GasyNet</label>
+                                <label className="form-label">Prestation GasyNet <small className="text-muted fw-normal">(Ar)</small></label>
                                 <input type="number" step="0.01" className="form-control" value={dossierData.prestationGasyNet} onChange={(e) => updateDossierField("prestationGasyNet", e.target.value)} />
                             </div>
                             <div className="col-md-4">
-                                <label className="form-label">APMF</label>
+                                <label className="form-label">APMF <small className="text-muted fw-normal">(Ar)</small></label>
                                 <input type="number" step="0.01" className="form-control" value={dossierData.apmf} onChange={(e) => updateDossierField("apmf", e.target.value)} />
                             </div>
                             <div className="col-md-4">
-                                <label className="form-label">DDP</label>
+                                <label className="form-label">DDP <small className="text-muted fw-normal">(Ar)</small></label>
                                 <input type="number" step="0.01" className="form-control" value={dossierData.ddp} onChange={(e) => updateDossierField("ddp", e.target.value)} />
                             </div>
                             <div className="col-md-4">
-                                <label className="form-label">Contrôle Radioactive</label>
+                                <label className="form-label">Contrôle Radioactive <small className="text-muted fw-normal">(Ar)</small></label>
                                 <input type="number" step="0.01" className="form-control" value={dossierData.controleRadioactive} onChange={(e) => updateDossierField("controleRadioactive", e.target.value)} />
                             </div>
                             <div className="col-md-4">
-                                <label className="form-label">Autres DAT</label>
+                                <label className="form-label">Autres DAT <small className="text-muted fw-normal">(Ar)</small></label>
                                 <input type="number" step="0.01" className="form-control" value={dossierData.autresDat} onChange={(e) => updateDossierField("autresDat", e.target.value)} />
                             </div>
                         </div>
@@ -805,25 +816,49 @@ const STYLE_PAR_DEFAUT = { backgroundColor: "#F3F4F6", color: "#374151", borderC
                             <thead className="table-light">
                             <tr>
                                 <th>Désignation</th>
-                                <th style={{ width: "110px" }}>PU (devise)<br/><small className="text-muted">saisi</small></th>
-                                <th style={{ width: "90px" }}>Quantité<br/><small className="text-muted">saisi</small></th>
-                                <th>Montant</th>
                                 <th>Code IMMO</th>
+                                <th style={{ width: "110px" }}>Montant (devise)<br/><small className="text-muted">saisi</small></th>
+                                <th style={{ width: "90px" }}>Quantité<br/><small className="text-muted">saisi</small></th>
+                                <th>PU (devise)</th>
                                 <th>PU en Ariary</th>
                             </tr>
                             </thead>
                             <tbody>
-                            {demandes.lots.map((lot) => {
-                                const saisie = saisies[lot.id] || emptyArticleSaisie();
-                                const r = resultatsParArticle[lot.id] || {};
+                            {lignes.map(({ rowKey, lot, label }) => {
+                                const saisie = saisies[rowKey] || emptyArticleSaisie();
+                                const r = resultatsParArticle[rowKey] || {};
                                 return (
-                                <tr key={lot.id}>
+                                <tr key={rowKey}>
                                     <td>
                                     <strong>{lot.codeLot}</strong>
+                                    {label && (
+                                        <span className="badge bg-info text-dark ms-1">{label}</span>
+                                    )}
                                     <br />
                                     <small className="text-muted">{lot.designation}</small>
+                                    <button 
+                                        type="button" 
+                                        className="btn btn-sm btn-link text-primary p-0 ms-2"
+                                        onClick={() => voirHistorique(lot.designation)}
+                                        title="Voir l'historique de cette désignation"
+                                    >
+                                         Historique
+                                    </button>
                                     </td>
-            
+                                     <td>
+                                        <input
+                                            type="text"
+                                            step="0.01"
+
+                                            className="form-control form-control-sm"
+                                            value={saisie.immo}
+                                            onChange={(e) =>
+                                            updateSaisieArticle(rowKey, "immo", e.target.value)
+                                            }
+                                            placeholder="Code IMMO"
+                                        />
+                                    </td>
+             
                                     {/* ✏️ Champ saisi */}
                                     <td>
                                     <input
@@ -832,12 +867,12 @@ const STYLE_PAR_DEFAUT = { backgroundColor: "#F3F4F6", color: "#374151", borderC
                                         className="form-control form-control-sm"
                                         value={saisie.prixUnitaire}
                                         onChange={(e) =>
-                                        updateSaisieArticle(lot.id, "prixUnitaire", e.target.value)
+                                        updateSaisieArticle(rowKey, "prixUnitaire", e.target.value)
                                         }
                                         required
                                     />
                                     </td>
-            
+             
                                     {/* ✏️ Champ saisi */}
                                     <td>
                                     <input
@@ -846,26 +881,16 @@ const STYLE_PAR_DEFAUT = { backgroundColor: "#F3F4F6", color: "#374151", borderC
                                         className="form-control form-control-sm"
                                         value={saisie.quantite}
                                         onChange={(e) =>
-                                        updateSaisieArticle(lot.id, "quantite", e.target.value)
+                                        updateSaisieArticle(rowKey, "quantite", e.target.value)
                                         }
                                         required
                                     />
                                     </td>
-            
+             
                                     {/* Calcul automatique en lecture seule */}
                                     <td className="text-end">{fmt(r.montant)}</td>
                                     {/* ✏️ Champ saisi - Code IMMO */}
-                                    <td>
-                                        <input
-                                            type="text"
-                                            className="form-control form-control-sm"
-                                            value={saisie.immo}
-                                            onChange={(e) =>
-                                            updateSaisieArticle(lot.id, "immo", e.target.value)
-                                            }
-                                            placeholder="Code IMMO"
-                                        />
-                                    </td>
+                                   
                                     <td className="text-end">
                                         <strong>{fmt(r.puAriary)} Ar</strong>
                                     </td>
@@ -875,12 +900,28 @@ const STYLE_PAR_DEFAUT = { backgroundColor: "#F3F4F6", color: "#374151", borderC
                             </tbody>
                             <tfoot>
                             <tr className="table-light">
-                                <td className="text-end"><strong>Totaux</strong></td>
+                                <td className=""><strong>Totaux</strong></td>
+                                <td></td>
                                 <td className="text-end"><strong>{fmt(totaux.totalPu)}</strong></td>
                                 
                             </tr>
                             </tfoot>
+                            <div className="row">
+                           
+                        </div>
                         </table>
+                         <div className="col-12">
+                                <label className="form-label text-muted">Commentaire :</label>
+                                <textarea
+                                    className="form-control"
+                                    rows="4"
+                                    placeholder="Saisissez un commentaire concernant le traitement de cette demande..."
+                                    value={commentaire}
+                                    onChange={(e) => setCommentaire(e.target.value)}
+                                    maxLength={1000}
+                                ></textarea>
+                               
+                            </div>
                         </div>
                     </div>
             
@@ -896,5 +937,61 @@ const STYLE_PAR_DEFAUT = { backgroundColor: "#F3F4F6", color: "#374151", borderC
                 
             </div>
         </div>
+        
+        {designationSelectionnee && (
+            <div className="modal-overlay" onClick={() => setDesignationSelectionnee(null)}>
+                <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                    <div className="modal-header">
+                        <h5>Historique : {designationSelectionnee}</h5>
+                        <button className="btn btn-sm btn-close" onClick={() => setDesignationSelectionnee(null)}></button>
+                    </div>
+                    <div className="modal-body">
+                        {loadingHist ? (
+                            <div className="text-center">Chargement de l'historique...</div>
+                        ) : historiqueArticles.length === 0 ? (
+                            <div className="text-center text-muted">Aucun historique disponible pour cette désignation.</div>
+                        ) : (
+                            <table className="table table-bordered table-striped table-sm align-middle">
+                                <thead className="table-light">
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>N° Demande</th>
+                                        <th>Code Lot</th>
+                                        <th>Statut Demande</th>
+                                        <th className="text-end">Prix de Revient</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {historiqueArticles.map((art, idx) => (
+                                        <tr key={art.demandeId || idx}>
+                                            <td>{art.date ? new Date(art.date).toLocaleDateString('fr-FR') : "N/A"}</td>
+                                            <td>N° {String(art.demandeId).padStart(3, '0')}</td>
+                                            <td><span className="badge bg-secondary">{art.codeLot}</span></td>
+                                            <td>
+                                                <span style={{
+                                                    color: art.status === "Nouvelle" ? "#000927" : art.status === "En attente" ? "#854D0E" : art.status === "Validée" ? "#166534" : art.status === "En cours" ? "#856404" : "#9F1239",
+                                                    backgroundColor: art.status === "Nouvelle" ? "#a9caf5" : art.status === "En attente" ? "#FEF9C3" : art.status === "Validée" ? "#DCFCE7" : art.status === "En cours" ? "#fff3cd" : "#FFE4E6",
+                                                    padding: "4px 10px",
+                                                    borderRadius: "9999px",
+                                                    fontSize: "12px",
+                                                    fontWeight: 500,
+                                                    display: "inline-block"
+                                                }}>
+                                                    {art.status}
+                                                </span>
+                                            </td>
+                                            <td className="text-end text-success">
+                                                <strong>{fmt(art.prixDeRevient || 0)} Ar</strong>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+
+                        )}
+                    </div>
+                </div>
+            </div>
+        )}
     </>
 }

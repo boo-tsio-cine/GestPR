@@ -1,8 +1,21 @@
 .welcome{
     width: 100%;
     height: 100%;
-    background-image: linear-gradient(360deg, rgba(15, 8, 8, 0.9)  ),url("../../public/fonds/pint3.jpg");
+    background-image: linear-gradient(360deg, rgba(15, 8, 8, 0.9)  ),url("/fonds/pint4.jpg");
     background-repeat: no-repeat;
     background-size: cover;
 
+}
+
+.image_welcome{
+  width: 5rem;
+  height: 5rem;
+  margin: 0 auto;
+  overflow: hidden;
+}
+
+.image_welcome img{
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }

@@ -100,8 +100,10 @@ export const demandeService = {
           "Content-Type": "multipart/form-data"
       }
   }),
+
+  getHistoriqueByDesignation: (designation) => api.get(`/demandes/historique/${encodeURIComponent(designation)}`),
   updateStatus : (id, status, motif) => api.put(`/demandes/${id}/status`, { status, motif }),
-  };
+};
 
 export const articleService = {
   createBulk: (articles) => api.post("/articles/bulk", articles),

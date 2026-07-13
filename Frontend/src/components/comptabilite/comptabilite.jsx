@@ -55,6 +55,8 @@ function Comptabilite(){
                     date: d.dateTime ?? d.DateTime,
                     demandeurId: idDuDemandeur,
 
+                    site: utilisateurTrouve ? (utilisateurTrouve.site || utilisateurTrouve.Site || "") : "",
+
                     // 👤 Si trouvé, on affiche son Nom (ajuste .nom ou .displayName selon ton API)
                     nomDemandeur : utilisateurTrouve
                         ? (utilisateurTrouve.nom || utilisateurTrouve.Nom || utilisateurTrouve.username)
@@ -67,6 +69,10 @@ function Comptabilite(){
                     matricule : utilisateurTrouve
                         ? (utilisateurTrouve.matricule || utilisateurTrouve.Matricule || utilisateurTrouve.matricule)
                         : `Utilisateur N°${idDuDemandeur}`,
+                    
+                    site : utilisateurTrouve
+                        ? (utilisateurTrouve.site || utilisateurTrouve.Site || utilisateurTrouve.site)
+                        : `Utilisateur N°${idDuDemandeur}`, 
 
                     lots: (d.articles ?? d.Articles ?? []).map((a) =>({
                         id: a.id ?? a.Id ?? 0,
@@ -135,9 +141,12 @@ function Comptabilite(){
 
     return<>
         <Nav className="navbar"/>
+        <div className="compta">
+            
+        </div>
         <Card className="card">
-            <CardHeader>
-                <nav className="navbar navbar-expand-lg bg-light shadow-sm rounded mb-4 navfiltre">
+            <CardHeader className="compta-filtre-header">
+                <nav className="navbar navbar-expand-lg  shadow-sm rounded mb-4 navfiltre">
                     <div className="container-fluid">
                         <span className="navbar-brand fw-bold">Filtres</span><br/>
                         <div className="row g-3 w-100">
@@ -172,7 +181,7 @@ function Comptabilite(){
                             </div>
                             <div className="col-md-2" style={{ position: "relative", marginTop: "3rem" }}>
                                 <button
-                                    className="btn btn-outline-success w-100 bg-success text-white"
+                                    className="btn  w-100 btn-reinit text-white"
                                     onClick={() => {
                                         setFiltrerDate("");
                                         setFiltrerStatus("");
@@ -202,7 +211,8 @@ function DemandesTable({ data, empty }) {
     const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
     const date= new Date().toLocaleDateString('fr-FR', options)
     return (
-        <div className="w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+        
+        <div className="w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm ">
             <div className="title">
                 Demande à traiter
             </div>
@@ -213,19 +223,30 @@ function DemandesTable({ data, empty }) {
                     <div className="card-head">
                         <time>{d.date ? new Date(d.date).toLocaleDateString('fr-FR') : "Date inconnue"}</time>
                         <div>DEM-
-                            {d.id < 10 
+                            {   d.id < 10 
                                 ? `00${d.id}` 
                                 : d.id < 100 
                                     ? `0${d.id}` 
                                     : d.id
                             }
                         </div>
-                        <data value="completed" className="status-badge bg-success">{d.status}</data>
+                        <data
+                            value="completed"
+                            className="status-badge"
+                            style={{
+                                backgroundColor: d.status === "Nouvelle" ? "#a9caf5" : d.status === "En attente" ? "#FEF9C3" : d.status === "Validée" ? "#DCFCE7" : "#FFE4E6",
+                                color: d.status === "Nouvelle" ? "#000927" : d.status === "En attente" ? "#854D0E" : d.status === "Validée" ? "#166534" : "#9F1239",
+                                width:'8rem',
+                                height:'100%',
+                                borderRadius:'5px',
+                                textAlign:'center'
+                            }}
+                        >{d.status}</data>
                     </div>
                     <div className="card-desc">
                         
                         <div className="card-site">
-                            <div>SIEGE</div>
+                            <div>{d.site || "Site inconnu"}</div>
                         </div>
                         <div className="card-id">
                             <p>{d.nomDemandeur} {d.prenomDemandeur}</p>

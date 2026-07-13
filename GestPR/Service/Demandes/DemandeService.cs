@@ -84,10 +84,35 @@ namespace GestPR.Service
         }
 
         // 💡 UN SEUL BLOC : Reçoit le fichier, génère le GUID unique et l'enregistre sur le disque dur
-        public async Task<bool> SoumettreDemandeAsync(int id, IFormFile pdfFile)
+        public async Task<bool> SoumettreDemandeAsync(int id, IFormFile pdfFile, string articlesJson, string? commentaire)
         {
             var demande = await _repo.GetByIdAsync(id);
             if (demande == null) return false;
+
+            demande.Commentaire = commentaire;
+
+            // 1. Enregistrement des prix de revient des articles
+            if (!string.IsNullOrWhiteSpace(articlesJson))
+            {
+                // Désérialisation du JSON envoyé par le Front-end
+                var articlesSaisis = System.Text.Json.JsonSerializer.Deserialize<List<ArticlePrixDto>>(articlesJson, new System.Text.Json.JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+                if (articlesSaisis != null)
+                {
+                    foreach (var artSaisi in articlesSaisis)
+                    {
+                        // On retrouve l'article associé à cette demande par son ID
+                        var articleBdd = demande.Articles.FirstOrDefault(a => a.Id == artSaisi.ArticleId);
+                        if (articleBdd != null)
+                        {
+                            articleBdd.PrixDeRevient = artSaisi.PrixDeRevient;
+                        }
+                    }
+                }
+            }
 
             if (pdfFile != null && pdfFile.Length > 0)
             {
@@ -130,6 +155,31 @@ namespace GestPR.Service
             return true;
         }
 
+        public async Task<IEnumerable<object>> GetHistoriqueByDesignationAsync(string designation)
+        {
+            var articles = await _repo.GetHistoriqueByDesignationAsync(designation);
+
+            var historique = new List<object>();
+            foreach (var art in articles)
+            {
+                var dema = await _repo.GetByIdAsync(art.DemandeId);
+                if (dema != null)
+                {
+                    historique.Add(new
+                    {
+                        DemandeId = dema.Id,
+                        Date = dema.DateTime,
+                        Status = dema.Status,
+                        CodeLot = art.CodeLot,
+                        PrixDeRevient = art.PrixDeRevient // ✅ Correction : Plus de virgule pendante inutile après la dernière propriété !
+                   
+                    });
+                }
+            }
+            return historique;
+        }
+
+        // Conversion Model → DTO
         // Conversion Model → DTO
         private static DemandeAvecArticleResponseDto MapToDto(Demande d) => new()
         {
@@ -139,12 +189,14 @@ namespace GestPR.Service
             DateTime = d.DateTime,
             DemandeurId = d.DemandeurId,
             PdfFileName = d.PdfFileName,
+            Commentaire = d.Commentaire ?? "",
             Articles = d.Articles.Select(a => new ArticleResponseDto
             {
                 Id = a.Id,
                 CodeLot = a.CodeLot,
                 Designation = a.Designation,
                 DemandeId = d.Id,
+                PrixDeRevient = a.PrixDeRevient
             }).ToList()
         };
     }

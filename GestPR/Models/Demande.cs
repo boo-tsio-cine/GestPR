@@ -16,8 +16,14 @@ namespace GestPR.Models
         [MaxLength(255)]
         public string? PdfFileName { get; set; }
 
+        [MaxLength(1000)]
+        public string? Commentaire { get; set; }
+
+
         [Required]
         public DateTime DateTime { get; set; } = DateTime.UtcNow;
+
+
 
         // === Clé étrangère (IMPORTANT) ===
         public int DemandeurId { get; set; }

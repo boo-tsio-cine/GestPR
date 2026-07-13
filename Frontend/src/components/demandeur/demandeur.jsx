@@ -342,7 +342,7 @@ function Demandeur() {
                                         </div>
                                         <div className="col-md-2" style={{ position: "relative", marginTop: "3rem" }}>
                                             <button
-                                                className="btn btn-outline-success w-100 bg-success text-white"
+                                                className="btn  w-100 btn-reinit text-white"
                                                 onClick={() => {
                                                     setFiltrerDate("");
                                                     setFiltrerStatus("");
@@ -375,19 +375,20 @@ function Demandeur() {
                             </DialogDescription>
                         </DialogHeader>
                         {detail && (
-                            <Table>
+                            <Table className = "dialog-detail">
                                 <TableHeader>
-                                    <TableRow>
-                                        <TableHead>IdArticle</TableHead>
-                                        <TableHead>Code Lot</TableHead>
-                                        <TableHead>Désignation</TableHead>
-                                        <TableHead>Motif</TableHead>
+                                    <TableRow className="table-dialog">
+                                        <TableHead className="table-dialog-head">IdArticle</TableHead>
+                                        <TableHead className="table-dialog-head">Code Lot</TableHead>
+                                        <TableHead className="table-dialog-head">Désignation</TableHead>
+                                        <TableHead className="table-dialog-head">Motif</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {(detail.lots ?? []).map((a, i) => (
+                                        //{String(id).padStart(3, '0')}
                                         <TableRow key={a.id || i}>
-                                            <TableCell>{a.id}</TableCell>
+                                            <TableCell>{String(a.id).padStart(3, '0')}</TableCell>
                                             <TableCell className="font-mono">{a.codeLot || "—"}</TableCell>
                                             <TableCell>{a.designation || "—"}</TableCell>
                                             <TableCell>{detail.motif || "—"}</TableCell>
@@ -449,8 +450,8 @@ function DemandesTable({ data, onDetail, onVoirPdf, empty }) {
                                 </span>
                             </TableCell>
                             <TableCell className="px-4 py-3 status" style={{
-                                color: d.status === "Nouvelle" ? "#1E40AF" : d.status === "En attente" ? "#854D0E" : d.status === "Validée" ? "#166534" : "#9F1239",
-                                backgroundColor: d.status === "Nouvelle" ? "#DBEAFE" : d.status === "En attente" ? "#FEF9C3" : d.status === "Validée" ? "#DCFCE7" : "#FFE4E6",
+                                color: d.status === "Nouvelle" ? "#000927" : d.status === "En attente" ? "#854D0E" : d.status === "Validée" ? "#166534" : "#9F1239",
+                                backgroundColor: d.status === "Nouvelle" ? "#a9caf5" : d.status === "En attente" ? "#FEF9C3" : d.status === "Validée" ? "#DCFCE7" : "#FFE4E6",
                                 
                             }}>
                                 {d.status}
@@ -458,10 +459,14 @@ function DemandesTable({ data, onDetail, onVoirPdf, empty }) {
                             <TableCell className="px-4 py-3 text-right">
                                 <div className="flex justify-end gap-2">
                                     <Button size="sm" variant="outline" className="gap-1 btn_detail" onClick={() => onDetail(d)}>
+                                        <span></span>
+                                        <span></span>
+                                        <span></span>
+                                        <span></span>
                                         <Eye className="h-4 w-4" /> Détail
                                     </Button>
                                     {(d.status === "Validée" || d.status === "Refusée") && d.pdfFileName && (
-                                        <Button size="sm" variant="outline" className="gap-1" onClick={() => onVoirPdf(d)}>
+                                        <Button size="sm" variant="outline" className="gap-1 btn_detail2" onClick={() => onVoirPdf(d)}>
                                             <Eye className="h-4 w-4 eyehover"  /> Voir fichier
                                         </Button>
                                     )}

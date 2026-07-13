@@ -67,21 +67,16 @@ namespace GestPR.Controllers
         }
 
         // 💡 SOUSETTRE PDF (La seule et unique méthode valide pour cette route)
+        // 💡 SOUMETTRE PDF & PRIX DE REVIENT
         [HttpPost("{id}/soumettre")]
-        [Consumes("multipart/form-data")] // Indique explicitement le type à Swagger
+        [Consumes("multipart/form-data")]
         public async Task<IActionResult> SoumettreTraitement([FromRoute] int id, [FromForm] SoumettreDemandeDto dto)
         {
-            if (dto.PdfFile == null || dto.PdfFile.Length == 0)
-            {
-                return BadRequest("Fichier PDF manquant ou invalide.");
-            }
+            // On extrait les valeurs du DTO pour les passer au service existant
+            var reussite = await _service.SoumettreDemandeAsync(id, dto.PdfFile, dto.Articles, dto.Commentaire);
+            if (!reussite) return NotFound("Demande introuvable");
 
-            // Dans ton code de service, tu passeras : dto.PdfFile
-            var resultat = await _service.SoumettreDemandeAsync(id, dto.PdfFile);
-
-            if (!resultat) return NotFound("Demande introuvable.");
-
-            return Ok(new { message = "Demande soumise avec succès." });
+            return Ok(new { message = "Traitement, commentaire enregistrés, prix sauvegardés et statut mis à jour à 'En cours'" });
         }
 
         // PUT api/demandes/{id}/status
@@ -101,6 +96,13 @@ namespace GestPR.Controllers
             if (string.IsNullOrEmpty(demande.PdfFileName)) return NotFound("Fichier non trouvé");
 
             return Redirect($"/uploads/pdfs/{demande.PdfFileName}");
+        }
+
+        [HttpGet("historique/{designation}")]
+        public async Task<IActionResult> GetHistorique(string designation)
+        {
+            var result = await _service.GetHistoriqueByDesignationAsync(designation);
+            return Ok(result);
         }
     }
 }

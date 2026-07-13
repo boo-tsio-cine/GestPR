@@ -45,4 +45,5 @@ namespace GestPR.Dtos
         public string OldPassword { get; set; } = "";
         public string NewPassword { get; set; } = "";
     }
-}
+} 
+

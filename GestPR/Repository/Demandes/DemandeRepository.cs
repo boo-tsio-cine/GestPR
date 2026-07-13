@@ -1,6 +1,9 @@
 ﻿using GestPR.Data;
 using GestPR.Models;
 using Microsoft.EntityFrameworkCore;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace GestPR.Repository.Demandes
 {
@@ -19,7 +22,7 @@ namespace GestPR.Repository.Demandes
             return await _context.Demande
                 .Where(d => d.DemandeurId == DemandeurId)
                 .Include(d => d.Articles) // Inclure les articles liés
-                .Include(d => d.Demandeur)// Optionnel : si tu veux les infos de l'utilisateur
+                .Include(d => d.Demandeur) // Optionnel : si tu veux les infos de l'utilisateur
                 .OrderByDescending(d => d.DateTime)
                 .ToListAsync();
         }
@@ -71,13 +74,19 @@ namespace GestPR.Repository.Demandes
         public async Task<bool> UserExistsAsync(int userId)
         {
             return await _context.Users.AnyAsync(u => u.Id == userId);
-
-
         }
 
         public async Task SaveChangesAsync()
         {
             await _context.SaveChangesAsync();
+        }
+
+        // ✅ MÉTHODE AJOUTÉE : Implémentation requise par IDemandeRepository
+        public async Task<IEnumerable<Article>> GetHistoriqueByDesignationAsync(string designation)
+        {
+            return await _context.Article
+                .Where(a => a.Designation == designation)
+                .ToListAsync();
         }
     }
 }
