@@ -23,7 +23,7 @@ function Nav(){
 
     return<>
         <nav className="navbar  px-4" style={{
-            color:"red", backgroundColor:"#c00707",position:"fixed"
+            color:"red", backgroundColor:"#c00707",position:"fixed" 
         }}>
             <div className="logo">
                 <img src={logo} alt="logo" onError={(e) => {    // ← fallback si image manquante

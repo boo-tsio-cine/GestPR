@@ -4,6 +4,7 @@ using GestPR.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GestPR.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260715055321_AddApplicationUsersTable")]
+    partial class AddApplicationUsersTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -70,7 +73,7 @@ namespace GestPR.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("ApplicationUsers");
+                    b.ToTable("ApplicationUsers", "dbo");
                 });
 
             modelBuilder.Entity("GestPR.Models.Article", b =>
@@ -291,7 +294,7 @@ namespace GestPR.Migrations
 
             modelBuilder.Entity("GestPR.Models.Demande", b =>
                 {
-                    b.HasOne("GestPR.Models.ApplicationUser", "Demandeur")
+                    b.HasOne("GestPR.Models.User", "Demandeur")
                         .WithMany()
                         .HasForeignKey("DemandeurId")
                         .OnDelete(DeleteBehavior.Cascade)

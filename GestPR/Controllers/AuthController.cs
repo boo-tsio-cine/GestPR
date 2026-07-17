@@ -1,18 +1,18 @@
 using GestPR.Data;
+using GestPR.DTOs; // <--- INDISPENSABLE pour IConfiguration
+using GestPR.Models;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient; // <--- INDISPENSABLE pour SqlConnection
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Text;
-using GestPR.Models;
-using Star.Security.Ldap.Services;
-using Microsoft.AspNetCore.Identity.Data;
 using System.Security.Principal;
-using Star.Security.Ldap;
-using Microsoft.Data.SqlClient; // <--- INDISPENSABLE pour SqlConnection
-using Microsoft.Extensions.Configuration; // <--- INDISPENSABLE pour IConfiguration
+using System.Text;
+using System.Text.Json;
 
 namespace GestPR.Controllers
 {
@@ -21,154 +21,200 @@ namespace GestPR.Controllers
     public class AuthController : ControllerBase
     {
         private readonly AppDbContext _context;
-
+        private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly string _identityConnectionString;
 
-        public AuthController(AppDbContext context, IConfiguration configuration)
+        public AuthController(AppDbContext context, IConfiguration configuration, IHttpContextAccessor httpContextAccessor)
         {
             _context = context;
             _identityConnectionString = configuration.GetConnectionString("StarIdentityConnection") ?? "";
+            _httpContextAccessor = httpContextAccessor;
         }
 
         [HttpGet("windows-login")]
-        public IActionResult WindowsLogin([FromServices] StarIdentityService identityService)
+      
+        public async Task<IActionResult> GetLogin()
         {
-            // On demande au package de vérifier l'utilisateur actuel pour l'application "GestPR"
-            var user = identityService.GetUserFromSession(HttpContext, "GestPR");
-
-            if (!user.IsAuthenticated)
+            try
             {
-                return Unauthorized($"Accès refusé. Le matricule {user.Username} n'est pas autorisé sur la gestion des prix de revient");
-            }
-            return Ok(new
-            {
-                Message = "Connecté via StarLdapSolution",
-                Username = user.Username,
-                Nom = user.Nom,
-                Prenom = user.Prenom,
-                Role = user.Role,
-            });
-        }
+                string? rawUser = null;
 
-
-
-        //R2CUP2RER LES UTILISATEUR pour l(affichage
-        [HttpGet("utilisateurs")]
-        public IActionResult GetAllUtilisateurs()
-        {
-            var liste = new List<object>();
-
-            using (var connection = new SqlConnection(_identityConnectionString))
-            {
-                // On récupère uniquement les utilisateurs liés à l'application "GestPR"
-                string query = "SELECT Id, AdUsername, Role, Nom, Prenom, Mail, Fixe, Site FROM ApplicationUsers WHERE ApplicationName = 'GestPR'";
-                using (var command = new SqlCommand(query, connection))
+                // --- MANIÈRE 1 : Variables serveur IIS (La méthode reine en déploiement IIS d'entreprise) ---
+                var serverVariables = HttpContext.Features.Get<Microsoft.AspNetCore.Http.Features.IServerVariablesFeature>();
+                if (serverVariables != null)
                 {
-                    connection.Open();
-                    using (var reader = command.ExecuteReader())
-                    {
-                        while (reader.Read())
-                        {
-                            liste.Add(new
-                            {
-                                id = Convert.ToInt32(reader["Id"]),
-                                matricule = reader["AdUsername"].ToString(),
-                                role = reader["Role"].ToString(),
-                                nom = reader["Nom"].ToString(),
-                                prenom = reader["Prenom"].ToString(),
-                                mail = reader["Mail"].ToString(),  // Récupère le vrai mail
-                                fixe = reader["Fixe"].ToString(),  // Récupère le vrai fixe
-                                site = reader["Site"].ToString()   // Récupère le vrai site
-                            });
-                        }
-                    }
+                    rawUser = serverVariables["LOGON_USER"] ?? serverVariables["AUTH_USER"];
                 }
+
+                // --- MANIÈRE 2 : Contexte utilisateur HTTP (S'appuie sur l'authentification Windows du protocole HTTP) ---
+                if (string.IsNullOrEmpty(rawUser))
+                {
+                    rawUser = HttpContext.User?.Identity?.Name
+                              ?? HttpContext.User?.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
+                }
+
+                // --- SÉCURITÉ DEPLOIEMENT : Suppression absolue d'Environment.UserName ---
+                // Si on détecte un compte de service IIS à cause d'une mauvaise configuration système, on refuse
+                if (!string.IsNullOrEmpty(rawUser) &&
+                    (rawUser.Contains("IIS APPPOOL", StringComparison.OrdinalIgnoreCase) ||
+                     rawUser.Contains("NETWORK SERVICE", StringComparison.OrdinalIgnoreCase) ||
+                     rawUser.Contains("SYSTEM", StringComparison.OrdinalIgnoreCase)))
+                {
+                    rawUser = null; // On invalide pour forcer une erreur explicite d'authentification utilisateur
+                }
+
+                // --- VÉRIFICATION GLOBALE ---
+                if (string.IsNullOrEmpty(rawUser))
+                {
+                    return Unauthorized(new
+                    {
+                        Connected = false,
+                        Message = "Impossible d'identifier votre session Windows d'entreprise. Veuillez vérifier que l'authentification Windows est active sur votre navigateur et sur IIS."
+                    });
+                }
+
+                // Nettoyage du domaine si présent (S_TANA_00\tsio700529 -> tsio700529)
+                string cleanedUserName = rawUser.Contains("\\")
+                    ? rawUser.Split('\\')[1]
+                    : rawUser;
+
+                // Recherche de l'utilisateur dans la base de données
+                var dbUser = await _context.ApplicationUsers
+                    .FirstOrDefaultAsync(u => u.AdUsername.ToLower() == cleanedUserName.ToLower()
+                                           && u.ApplicationName == "GestPR");
+
+                if (dbUser == null)
+                {
+                    return Unauthorized(new
+                    {
+                        Connected = false,
+                        Message = $"L'utilisateur '{cleanedUserName}' n'est pas configuré pour accéder à l'application GestPR."
+                    });
+                }
+
+                // Vérification du statut du compte
+                if (dbUser.IsActive != 1)
+                {
+                    return StatusCode(403, new
+                    {
+                        Connected = false,
+                        Message = "Votre compte utilisateur est désactivé."
+                    });
+                }
+
+                // Succès : Envoi des données de l'utilisateur connecté vers le Frontend
+                return Ok(new
+                {
+                    Connected = true,
+                    Id = dbUser.Id,
+                    Username = dbUser.AdUsername,
+                    Nom = dbUser.Nom,
+                    Prenom = dbUser.Prenom,
+                    Mail = dbUser.Mail,
+                    Role = dbUser.Role,
+                    Site = dbUser.Site,
+                    RawIdentityUsed = rawUser, // Permet de valider que c'est bien l'AD de l'utilisateur distant qui est reçu
+                    Timestamp = DateTime.Now
+                });
             }
-            return Ok(liste);
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    Connected = false,
+                    Message = "Une erreur est survenue lors de la vérification de l'identité.",
+                    Error = ex.Message
+                });
+            }
         }
+
+        // ==========================================
+        // 2. RECUPERER LES UTILISATEURS (Pour l'affichage)
+        // ==========================================
+        [HttpGet("utilisateurs")]
+        public async Task<IActionResult> GetAllUtilisateurs()
+        {
+            var utilisateurs = await _context.ApplicationUsers
+                .Where(u => u.ApplicationName == "GestPR")
+                .Select(u => new
+                {
+                    id = u.Id,
+                    matricule = u.AdUsername,
+                    role = u.Role,
+                    nom = u.Nom,
+                    prenom = u.Prenom,
+                    mail = u.Mail,
+                    fixe = u.Fixe,
+                    site = u.Site
+                })
+                .ToListAsync();
+
+            return Ok(utilisateurs);
+        }
+
         // ==========================================
         // 3. CREER UN NOUVEL UTILISATEUR (POST)
         // ==========================================
-
         [HttpPost("utilisateurs")]
-        public IActionResult CreateUtilisateur([FromBody] NewUserDto model)
+        public async Task<IActionResult> CreateUtilisateur([FromBody] NewUserDto model)
         {
             if (string.IsNullOrEmpty(model.Matricule)) return BadRequest("Le matricule est obligatoire.");
 
-            // Automatisation du suffixe de l'adresse mail
             string emailComplet = "";
             if (!string.IsNullOrEmpty(model.MailPrefix))
             {
                 emailComplet = $"{model.MailPrefix.Trim()}@castel-afrique.com";
             }
 
-            using (var connection = new SqlConnection(_identityConnectionString))
+            var nouvelUtilisateur = new ApplicationUser // Modifie le nom de la classe si ton modèle EF s'appelle autrement
             {
-                string query = @"INSERT INTO ApplicationUsers (AdUsername, ApplicationName, Role, IsActive, Nom, Prenom, Mail, Fixe, Site) 
-                        VALUES (@username, 'GestPR', @role, 1, @nom, @prenom, @mail, @fixe, @site)";
+                AdUsername = model.Matricule,
+                ApplicationName = "GestPR",
+                Role = string.IsNullOrEmpty(model.Role) ? "Demandeur" : model.Role,
+                IsActive = 1,
+                Nom = model.Nom ?? "",
+                Prenom = model.Prenom ?? "",
+                Mail = emailComplet,
+                Fixe = model.Fixe ?? "",
+                Site = string.IsNullOrEmpty(model.Site) ? "STAR" : model.Site
+            };
 
-                using (var command = new SqlCommand(query, connection))
-                {
-                    command.Parameters.AddWithValue("@username", model.Matricule);
-                    command.Parameters.AddWithValue("@role", string.IsNullOrEmpty(model.Role) ? "Demandeur" : model.Role);
-                    command.Parameters.AddWithValue("@nom", model.Nom ?? "");
-                    command.Parameters.AddWithValue("@prenom", model.Prenom ?? "");
-                    command.Parameters.AddWithValue("@mail", emailComplet);
-                    command.Parameters.AddWithValue("@fixe", model.Fixe ?? "");
-                    command.Parameters.AddWithValue("@site", string.IsNullOrEmpty(model.Site) ? "STAR" : model.Site);
+            _context.ApplicationUsers.Add(nouvelUtilisateur);
+            await _context.SaveChangesAsync();
 
-                    connection.Open();
-                    command.ExecuteNonQuery();
-                }
-            }
             return Ok(new { Message = "Utilisateur créé avec succès !" });
         }
 
         // ==========================================
-        // 4. MODIFIER UN UTILISATEUR (PUT pour l'édition inline)
+        // 4. MODIFIER UN UTILISATEUR (PUT)
         // ==========================================
         [HttpPut("utilisateurs/{id}")]
-        public IActionResult UpdateUtilisateur(int id, [FromBody] NewUserDto model)
+        public async Task<IActionResult> UpdateUtilisateur(int id, [FromBody] NewUserDto model)
         {
             if (string.IsNullOrEmpty(model.Matricule)) return BadRequest("Le matricule est obligatoire.");
 
-            // Automatisation du suffixe si un préfixe est fourni, sinon on garde une chaîne vide
+            var dbUser = await _context.ApplicationUsers
+                .FirstOrDefaultAsync(u => u.Id == id && u.ApplicationName == "GestPR");
+
+            if (dbUser == null) return NotFound("Utilisateur non trouvé.");
+
             string emailComplet = "";
             if (!string.IsNullOrEmpty(model.MailPrefix))
             {
-                // Si l'utilisateur tape déjà le mail complet par erreur, on évite le doublon
                 emailComplet = model.MailPrefix.Contains("@")
                     ? model.MailPrefix.Trim()
                     : $"{model.MailPrefix.Trim()}@castel-afrique.com";
             }
 
-            using (var connection = new SqlConnection(_identityConnectionString))
-            {
-                string query = @"UPDATE ApplicationUsers 
-                        SET AdUsername = @username, 
-                            Role = @role, 
-                            Nom = @nom, 
-                            Prenom = @prenom,
-                            Mail = @mail,
-                            Fixe = @fixe,
-                            Site = @site
-                        WHERE Id = @id AND ApplicationName = 'GestPR'";
+            dbUser.AdUsername = model.Matricule;
+            dbUser.Role = string.IsNullOrEmpty(model.Role) ? "Demandeur" : model.Role;
+            dbUser.Nom = model.Nom ?? "";
+            dbUser.Prenom = model.Prenom ?? "";
+            dbUser.Mail = emailComplet;
+            dbUser.Fixe = model.Fixe ?? "";
+            dbUser.Site = string.IsNullOrEmpty(model.Site) ? "STAR" : model.Site;
 
-                using (var command = new SqlCommand(query, connection))
-                {
-                    command.Parameters.AddWithValue("@id", id);
-                    command.Parameters.AddWithValue("@username", model.Matricule);
-                    command.Parameters.AddWithValue("@role", string.IsNullOrEmpty(model.Role) ? "Demandeur" : model.Role);
-                    command.Parameters.AddWithValue("@nom", model.Nom ?? "");
-                    command.Parameters.AddWithValue("@prenom", model.Prenom ?? "");
-                    command.Parameters.AddWithValue("@mail", emailComplet);
-                    command.Parameters.AddWithValue("@fixe", model.Fixe ?? "");
-                    command.Parameters.AddWithValue("@site", string.IsNullOrEmpty(model.Site) ? "STAR" : model.Site);
-                    connection.Open();
-                    int rows = command.ExecuteNonQuery();
-                    if (rows == 0) return NotFound("Utilisateur non trouvé.");
-                }
-            }
+            await _context.SaveChangesAsync();
             return NoContent();
         }
 
@@ -176,47 +222,32 @@ namespace GestPR.Controllers
         // 5. SUPPRIMER UN UTILISATEUR (DELETE)
         // ==========================================
         [HttpDelete("utilisateurs/{id}")]
-        public IActionResult DeleteUtilisateur(int id)
+        public async Task<IActionResult> DeleteUtilisateur(int id)
         {
-            using (var connection = new SqlConnection(_identityConnectionString))
-            {
-                // On sécurise la suppression en s'assurant qu'il s'agit bien d'un utilisateur de GestPR
-                string query = "DELETE FROM ApplicationUsers WHERE Id = @id AND ApplicationName = 'GestPR'";
+            var dbUser = await _context.ApplicationUsers
+                .FirstOrDefaultAsync(u => u.Id == id && u.ApplicationName == "GestPR");
 
-                using (var command = new SqlCommand(query, connection))
-                {
-                    command.Parameters.AddWithValue("@id", id);
+            if (dbUser == null)
+                return NotFound("Utilisateur non trouvé ou n'appartient pas à l'application GestPR.");
 
-                    connection.Open();
-                    int rowsAffected = command.ExecuteNonQuery();
+            _context.ApplicationUsers.Remove(dbUser);
+            await _context.SaveChangesAsync();
 
-                    if (rowsAffected == 0)
-                        return NotFound("Utilisateur non trouvé ou n'appartient pas à l'application GestPR.");
-                }
-            }
-            return NoContent(); // Code 204 : Suppression réussie sans contenu en retour
+            return NoContent();
         }
 
-        // RECUPERER LE NOMBRE TOTAL D'UTILISATEURS
+        // ==========================================
+        // 6. RECUPERER LE NOMBRE TOTAL D'UTILISATEURS
+        // ==========================================
         [HttpGet("utilisateurs/count")]
-        public IActionResult GetTotalUtilisateursCount()
+        public async Task<IActionResult> GetTotalUtilisateursCount()
         {
             try
             {
-                using (var connection = new SqlConnection(_identityConnectionString))
-                {
-                    // Requête optimisée avec COUNT(*)
-                    string query = "SELECT COUNT(*) FROM ApplicationUsers WHERE ApplicationName = 'GestPR'";
+                int total = await _context.ApplicationUsers
+                    .CountAsync(u => u.ApplicationName == "GestPR");
 
-                    using (var command = new SqlCommand(query, connection))
-                    {
-                        connection.Open();
-                        // ExecuteScalar est parfait ici car il ne retourne qu'un seul chiffre numérique
-                        int total = Convert.ToInt32(command.ExecuteScalar());
-
-                        return Ok(total);
-                    }
-                }
+                return Ok(total);
             }
             catch (Exception ex)
             {
@@ -225,22 +256,26 @@ namespace GestPR.Controllers
             }
         }
 
-
+        // ==========================================
+        // 7. RECUPERER PAR MATRICULE (La route qui bloquait)
+        // ==========================================
         [HttpGet("by-matricule/{matricule}")]
         public async Task<IActionResult> GetByMatricule(string matricule)
         {
-            // Va chercher l'utilisateur dans la table User via son AdUsername ou son Matricule
-            var user = await _context.Users
-                .FirstOrDefaultAsync(u => u.AdUsername == matricule);
+            var user = await _context.ApplicationUsers
+                .FirstOrDefaultAsync(u => u.AdUsername.ToLower() == matricule.ToLower()
+                                       && u.ApplicationName == "GestPR");
 
-            if (user == null) 
+            if (user == null)
             {
                 return NotFound(new
                 {
-                    message = $"Utilisateur avec le matricule { matricule } introuvable en base."
+                    message = $"Utilisateur avec le matricule {matricule} introuvable en base."
                 });
             }
-            return Ok(user);
+
+            // Renvoie exactement l'Id attendu par ton demandeur.jsx !
+            return Ok(new { Id = user.Id, Username = user.AdUsername });
         }
     }
 
@@ -258,7 +293,7 @@ namespace GestPR.Controllers
         public string Site { get; set; } = string.Empty;
     }
 
-        public class LoginRequest
+    public class LoginRequest
     {
         public string Username { get; set; } = string.Empty;
         public string Password { get; set; } = string.Empty;

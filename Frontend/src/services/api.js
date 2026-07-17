@@ -1,8 +1,19 @@
 import axios from "axios";
 
+// --- CONFIGURATION DES ADRESSES API ---
+const IS_PRODUCTION = window.location.hostname !== "localhost";
+
+// Laisse vide ("") si ton API déployée utilise le port par défaut (80 / 443).
+// Si ton IIS de production utilise un port spécifique (ex: 8080), écris : const PROD_PORT = ":8080";
+const PROD_PORT = ""; 
+
+const API_URL = IS_PRODUCTION 
+  ? `http://${window.location.hostname}${PROD_PORT}/api` // URL dynamique de production
+  : "http://localhost:5233/api";                        // URL locale de test
+
 const api = axios.create({
-  baseURL: "http://localhost:5233/api",
-  withCredentials:true,
+  baseURL: API_URL,
+  withCredentials: true,
   headers: {
     "Content-Type": "application/json",
   },
@@ -42,28 +53,29 @@ api.interceptors.response.use(
   }
 );
 
+// --- SERVICES DE L'APPLICATION (DÉCLARÉS UNE SEULE ET UNIQUE FOIS) ---
+
 export const userService = {
-  // Changement des routes pour pointer vers AuthController qui gère star_identity_db
   getAll: () => api.get("/Auth/utilisateurs/"),
   create: (data) => api.post("/Auth/utilisateurs", data),
   update: (id, data) => api.put(`/Auth/utilisateurs/${id}`, data),
-  delete: (id) => api.delete(`/Auth/utilisateurs/${id}`), // Optionnel si vous gérez la suppression
+  delete: (id) => api.delete(`/Auth/utilisateurs/${id}`), 
   count: () => api.get("/Auth/utilisateurs/count/"), 
-  idMatricule : () => api.get(`Auth/by-matricule/${matricule}`)
+  idMatricule: (matricule) => api.get(`/Auth/by-matricule/${matricule}`)
 };
 
 export const tauxService = {
   getAll: () => api.get("/taux/"),
   create: (data) => api.post("/taux/", data),
   update: (id, data) => api.put(`/taux/${id}`, data),
-  delete: (id) =>api.delete(`/taux/${id}`),
+  delete: (id) => api.delete(`/taux/${id}`),
   count: () => api.get("/taux/count/"),
 };
 
 export const frsService = {
   getAll: () => api.get("/frs"),
   create: (data) => api.post("/frs/", data),
-  delete: (id) =>api.delete(`/frs/${id}`),
+  delete: (id) => api.delete(`/frs/${id}`),
   update: (id, data) => api.put(`/frs/${id}`, data),
   count: () => api.get("/frs/count"),
 };
@@ -72,37 +84,33 @@ export const origineService = {
   getAll: () => api.get("/origines/"),
   getById: (id) => api.get(`/origines/${id}`),
   create: (data) => api.post("/origines/", data),
-  delete: (id) =>api.delete(`/origines/${id}`),
+  delete: (id) => api.delete(`/origines/${id}`),
   update: (id, data) => api.put(`/origines/${id}`, data),
   count: () => api.get("/origines/count")
 };
 
-
 export const tauxHistoriqueService = {
   getAll: () => api.get("/tauxHistorique/"),
-  // create: (data) => api.post("/tauxHistorique/", data),
- };
+};
 
 export const authService = {
-   
-
-  connexionAutomatiqueWindows:()=>api.get("/Auth/windows-login"),
-}
+  connexionAutomatiqueWindows: () => api.get("/Auth/windows-login"),
+};
 
 export const demandeService = {
-  getAll:  (idDemandeur) => api.get(`/demandes?idDemandeur=${idDemandeur}`),
-  create:  (data)        => api.post("/demandes", data),
-  get: () =>  api.get("/demandes/all"),
-  getDemande : (idDemande) => api.get(`/demandes/${idDemande}`),
+  getAll: (idDemandeur) => api.get(`/demandes?idDemandeur=${idDemandeur}`),
+  create: (data) => api.post("/demandes", data),
+  get: () => api.get("/demandes/all"),
+  getDemande: (idDemande) => api.get(`/demandes/${idDemande}`),
 
-  soumettreTraitement : (id, formData) => api.post(`/demandes/${id}/soumettre`, formData, {
+  soumettreTraitement: (id, formData) => api.post(`/demandes/${id}/soumettre`, formData, {
       headers: {
           "Content-Type": "multipart/form-data"
       }
   }),
 
   getHistoriqueByDesignation: (designation) => api.get(`/demandes/historique/${encodeURIComponent(designation)}`),
-  updateStatus : (id, status, motif) => api.put(`/demandes/${id}/status`, { status, motif }),
+  updateStatus: (id, status, motif) => api.put(`/demandes/${id}/status`, { status, motif }),
 };
 
 export const articleService = {

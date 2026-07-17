@@ -1,16 +1,19 @@
-﻿using Star.Security.Ldap;
-using GestPR.Data;
+﻿using GestPR.Data;
 using GestPR.Repository;
 using GestPR.Repository.Demandes;
 using GestPR.Repository.Taux_Historic;
 using GestPR.Service;
 using GestPR.Service.Demandes;
+using GestPR.Service.Email;
 using GestPR.Service.Taux_Historic;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authentication.Negotiate;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Server.IISIntegration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using System.Net.Security;
 using System.Text;
 
 namespace GestPR
@@ -21,12 +24,11 @@ namespace GestPR
         {
             var builder = WebApplication.CreateBuilder(args);
 
-            // ==========================================
+            // =========================================================
             // 1. ENREGISTREMENT DES SERVICES (BUILDER)
-            // ==========================================
+            // =========================================================
 
-            // Configuration LDAP
-            builder.Services.AddStarLdapAuthentication(builder.Configuration);
+            // 🔴 SUPPRIMÉ : builder.Services.AddStarLdapAuthentication (LDAP retiré)
 
             // Chaîne de connexion à la base de données
             var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
@@ -35,7 +37,6 @@ namespace GestPR
             builder.Services.AddDbContext<ApplicationDbContext>(options =>
                 options.UseSqlServer(connectionString));
 
-            // AppDbContext — pour vos données métier (Users, etc.)
             builder.Services.AddDbContext<AppDbContext>(options =>
                 options.UseSqlServer(connectionString));
 
@@ -49,26 +50,25 @@ namespace GestPR
             builder.Services.AddControllers()
                 .ConfigureApiBehaviorOptions(options =>
                 {
-                    options.SuppressModelStateInvalidFilter = true; // Désactive la validation automatique pour utiliser le logger personnalisé ci-dessous
+                    options.SuppressModelStateInvalidFilter = true;
                 });
 
-            // Configuration CORS (React Frontend)
-            // Configuration CORS unifiée pour React Frontend
+            // Configuration CORS (indispensable pour lier le frontend React sur le port 5173)
             builder.Services.AddCors(options =>
             {
-                options.AddPolicy("AllowFrontend", policy =>
+                options.AddPolicy("AllowReactApp", policy =>
                 {
-                    policy.WithOrigins("http://localhost:5173") // Pas de "/" à la fin !
-                          .AllowAnyHeader()
+                    policy.WithOrigins("http://localhost:5173")
                           .AllowAnyMethod()
-                          .AllowCredentials(); // 🟢 Activé ici de manière officielle
+                          .AllowAnyHeader()
+                          .AllowCredentials(); // Permet le transfert de l'identité de session Windows !
                 });
             });
 
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
 
-            // Formatter de logs personnalisé pour les erreurs de validation
+            // Formatter de logs pour les erreurs de validation
             builder.Services.Configure<ApiBehaviorOptions>(options =>
             {
                 options.InvalidModelStateResponseFactory = context =>
@@ -77,63 +77,70 @@ namespace GestPR
                         .Where(e => e.Value?.Errors.Count > 0)
                         .Select(e => new {
                             Field = e.Key,
-                            Errors = e.Value?.Errors.Select(x => x.ErrorMessage)
+                            // 🟢 CORRIGÉ : "[]" remplace "Array.Empty<string>()"
+                            Errors = e.Value?.Errors.Select(x => x.ErrorMessage) ?? []
                         });
                     Console.WriteLine("=== VALIDATION ERRORS ===");
                     foreach (var err in errors)
+                    {
                         Console.WriteLine($"{err.Field}: {string.Join(", ", err.Errors)}");
+                    }
                     return new BadRequestObjectResult(context.ModelState);
                 };
             });
 
-            // Authentification JWT
-            builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-                .AddJwtBearer(options => {
-                    options.TokenValidationParameters = new TokenValidationParameters
-                    {
-                        ValidateIssuer = true,
-                        ValidateAudience = true,
-                        ValidateLifetime = true,
-                        ValidateIssuerSigningKey = true,
-                        ValidIssuer = builder.Configuration["Jwt:Issuer"],
-                        ValidAudience = builder.Configuration["Jwt:Audience"],
-                        IssuerSigningKey = new SymmetricSecurityKey(
-                            Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)
-                        )
-                    };
-                });
+            // Accesseur HttpContext nécessaire pour lire la session de l'utilisateur
+            builder.Services.AddHttpContextAccessor();
+
+            // Configuration de l'authentification Windows de la session locale
+            builder.Services.AddAuthentication(options =>
+            {
+                options.DefaultScheme = IISDefaults.AuthenticationScheme;
+            });
+            // =========================================================
+            // CONFIGURATION DE L'AUTHENTIFICATION WINDOWS NATIVE (IIS)
+            // =========================================================
+            builder.Services.AddAuthentication(NegotiateDefaults.AuthenticationScheme)
+               .AddNegotiate();
+
+
+            builder.Services.AddAuthorization(options =>
+            {
+                options.FallbackPolicy = options.DefaultPolicy;
+            });
+
+
 
             builder.Services.AddAuthorization();
 
-            // Injection des Repositories & Services métier
+            // Enregistrement de tes services applicatifs
+
             builder.Services.AddScoped<IOrigineRepository, OrigineRepository>();
             builder.Services.AddScoped<IOrigineService, OrigineService>();
 
-           
             builder.Services.AddScoped<IDemandeRepository, DemandeRepository>();
             builder.Services.AddScoped<IDemandeService, DemandeService>();
 
             builder.Services.AddScoped<ITauxRepository, TauxRepository>();
             builder.Services.AddScoped<ITauxService, TauxService>();
 
-            builder.Services.AddScoped<StarIdentityService>();
-            // ==========================================
-            // 2. CONTEXTE DE L'APPLICATION (LA FRONTIÈRE)
-            // ==========================================
+            // Dans Program.cs
+            builder.Services.AddTransient<IEmailService, EmailService>();
+
+
+            // =========================================================
+            // 2. MIDDLEWARES PIPELINE
+            // =========================================================
             var app = builder.Build();
 
-            // 🟢 AJOUTER CE BLOC ICI (Tout en haut du pipeline de requêtes) :
+            // Middleware CORS personnalisé pour autoriser les cookies de session et Windows Auth (Credentials)
             app.Use(async (context, next) =>
             {
-                // On cible l'origine exacte de votre React
                 context.Response.Headers.Append("Access-Control-Allow-Origin", "http://localhost:5173");
                 context.Response.Headers.Append("Access-Control-Allow-Headers", "Content-Type, Authorization");
                 context.Response.Headers.Append("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-
-                // C'est ce header crucial qui manquait pour l'authentification Windows !
                 context.Response.Headers.Append("Access-Control-Allow-Credentials", "true");
 
-                // Si c'est une requête de pré-vérification (Preflight OPTIONS), on répond 200 OK immédiatement
                 if (context.Request.Method == "OPTIONS")
                 {
                     context.Response.StatusCode = 200;
@@ -144,12 +151,6 @@ namespace GestPR
                 await next();
             });
 
-            // Supprimez ensuite l'ancien app.UseCors("AllowFrontend") ou app.UseCors(options => ...) 
-            // car ce bloc gère tout proprement pour toutes les routes.
-
-            // ==========================================
-            // 3. PIPELINE DE REQUÊTES HTTP (MIDDLEWARES)
-            // ==========================================
             if (app.Environment.IsDevelopment())
             {
                 app.UseMigrationsEndPoint();
@@ -161,14 +162,28 @@ namespace GestPR
                 app.UseExceptionHandler("/Error");
                 app.UseHsts();
             }
-         
-            app.UseCors("AllowFrontend");
-            app.UseStaticFiles();
-            app.UseRouting();
-            // Permet d'accéder aux fichiers du dossier wwwroot via HTTP (Ex: http://localhost:5000/uploads/pdfs/mon-fichier.pdf)
-            app.UseStaticFiles();
 
-            // L'authentification doit TOUJOURS être placée AVANT l'autorisation
+            // Active le serveur de fichiers statiques pour le dossier wwwroot
+            app.UseStaticFiles(new StaticFileOptions
+            {
+                OnPrepareResponse = ctx =>
+                {
+                    // Si le fichier demandé est un PDF, on force l'affichage "inline"
+                    if (ctx.File.Name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+                    {
+                        ctx.Context.Response.Headers["Content-Disposition"] = "inline";
+                        ctx.Context.Response.Headers["Content-Type"] = "application/pdf";
+                    }
+                }
+            });
+            app.UseCors(policy => policy
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .SetIsOriginAllowed(origin => true) // Autorise toutes les adresses locales/réseau
+                .AllowCredentials());
+
+            app.UseRouting();
+
             app.UseAuthentication();
             app.UseAuthorization();
 

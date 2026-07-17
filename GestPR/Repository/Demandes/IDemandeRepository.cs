@@ -15,6 +15,8 @@ namespace GestPR.Repository.Demandes
 
         Task SaveChangesAsync();
 
+        Task<List<ApplicationUser>> GetUsersByRoleAsync(string role);
+
         Task<IEnumerable<Article>> GetHistoriqueByDesignationAsync(string designation);
     }
 }

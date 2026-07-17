@@ -9,6 +9,7 @@ export default function Valid() {
     
     const [selectedDemande, setSelectedDemande] = useState(null);
     const [currentPdfUrl, setCurrentPdfUrl] = useState("");
+    const [pdfFileName, setPdfFileName] = useState("");
     const [motif, setMotif] = useState("");
     const [filtreNumero, setFiltreNumero] = useState("");
     const [filtreDate, setFiltreDate] = useState("");
@@ -33,21 +34,43 @@ export default function Valid() {
         chargerDemandes();
     }, []);
 
-    const ouvrirDialog = (d) => {
-        setSelectedDemande(d);
-        setMotif(d.motif || "");
-        const baseUrl = api.defaults.baseURL ? new URL(api.defaults.baseURL).origin : "http://localhost:5233";
-        const urlComplet = d.pdfFileName 
-            ? `${baseUrl}/uploads/pdfs/${d.pdfFileName}`
-            : "";
-        setCurrentPdfUrl(urlComplet);
-        dialogRef.current?.showModal();
-    };
+    const ouvrirDialog = async (d) => {
+    setSelectedDemande(d);
+    setMotif(d.motif || "");
+    setPdfFileName(d.pdfFileName || "");
 
+    if (d.pdfFileName) {
+        try {
+            // ✔️ On appelle directement l'endpoint API GET /api/demandes/{id}/pdf
+            // Axios va automatiquement ajouter la baseURL correcte et le Token d'authentification !
+            const response = await api.get(`/demandes/${d.id}/pdf`, {
+                responseType: "blob",
+            });
+
+            const blob = new Blob([response.data], { type: "application/pdf" });
+            const url = URL.createObjectURL(blob);
+            setCurrentPdfUrl(url);
+        } catch (err) {
+            console.error("Erreur de chargement du PDF via l'API:", err);
+            setCurrentPdfUrl("");
+            toast.error("Impossible de charger le document PDF.");
+        }
+    } else {
+        setCurrentPdfUrl("");
+    }
+
+    requestAnimationFrame(() => {
+        dialogRef.current?.showModal();
+    });
+};
     const fermerDialog = () => {
+        if (currentPdfUrl && currentPdfUrl.startsWith("blob:")) {
+            URL.revokeObjectURL(currentPdfUrl);
+        }
         dialogRef.current?.close();
         setSelectedDemande(null);
         setCurrentPdfUrl("");
+        setPdfFileName("");
         setMotif("");
     };
 
@@ -60,6 +83,17 @@ export default function Valid() {
         } catch {
             toast.error("Impossible de mettre à jour le statut.");
         }
+    };
+
+    const telechargerPdf = () => {
+        if (!currentPdfUrl || !pdfFileName) return;
+
+        const a = document.createElement("a");
+        a.href = currentPdfUrl;
+        a.download = pdfFileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
     };
 
     const demandesFiltrees = useMemo(() => {
@@ -177,12 +211,24 @@ export default function Valid() {
                     <>
                         <div className="d-flex justify-content-between align-items-center mb-2">
                             <h5 className="m-0">Traitement de la demande DEM-{String(selectedDemande.id).padStart(3, '0')}</h5>
-                            <button className="btn btn-close" onClick={fermerDialog}></button>
+                            <div className="d-flex gap-2">
+                                {currentPdfUrl && (
+                                    <button 
+                                        className="btn btn-success btn-sm"
+                                        onClick={telechargerPdf}
+                                        title="Télécharger le PDF"
+                                    >
+                                        📥 Télécharger
+                                    </button>
+                                )}
+                                <button className="btn btn-close" onClick={fermerDialog}></button>
+                            </div>
                         </div>
                         
                         <div className="mb-2" style={{ flex: 1, minHeight: 0 }}>
                             {currentPdfUrl ? (
                                 <iframe 
+                                    key={currentPdfUrl}
                                     src={currentPdfUrl} 
                                     style={{ width: '100%', height: '100%', border: 'none' }}
                                     title="Aperçu PDF"
@@ -194,12 +240,6 @@ export default function Valid() {
 
                         <div className="mb-2">
                             <label className="form-label fw-bold">Motif / Commentaire</label>
-                            {selectedDemande.commentaire && (
-                                <div className="mb-2 p-2 border rounded bg-light">
-                                    <small className="text-muted fw-bold d-block">Commentaire :</small>
-                                    <div style={{ whiteSpace: "pre-wrap" }}>{selectedDemande.commentaire}</div>
-                                </div>
-                            )}
                             <textarea 
                                 className="form-control"
                                 rows="3"

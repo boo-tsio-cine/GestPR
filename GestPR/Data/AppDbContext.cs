@@ -9,8 +9,8 @@ namespace GestPR.Data
         {
         }
 
-       
 
+        public DbSet<ApplicationUser> ApplicationUsers { get; set; }
         public DbSet<User> Users { get; set; }
         public DbSet<Taux> Taux { get; set; }
         public DbSet<Fournisseur> Fournisseur { get; set; }

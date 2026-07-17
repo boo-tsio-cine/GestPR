@@ -29,7 +29,7 @@ namespace GestPR.Models
         public int DemandeurId { get; set; }
 
         // === Propriété de navigation ===
-        public User? Demandeur { get; set; }
+        public ApplicationUser? Demandeur { get; set; }
 
         public ICollection<Article> Articles { get; set; } = new List<Article>();
 

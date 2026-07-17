@@ -279,3 +279,31 @@ button:hover .eyehover {
     color: #28a745; /* Retour au Vert pour une boucle parfaite sans coupure */
   }
 }
+
+[Cardheader]{
+    /* z-index: -1000; */
+    .navfiltre{
+    z-index: -100;
+    /* background-color: rgb(253, 241, 241); */
+}
+}
+
+.card{
+    z-index: 0;
+}
+
+.card-fixe{
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+.card-header-fixe{
+    flex-shrink: 0;
+    z-index: 0;
+}
+
+.card-content-scroll{
+    overflow-y: auto;
+    flex: 1;
+}

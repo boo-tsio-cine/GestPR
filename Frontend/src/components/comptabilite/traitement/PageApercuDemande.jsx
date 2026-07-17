@@ -1,6 +1,7 @@
 import { toast } from "sonner";
 import { demandeService } from "../../../services/api";
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState} from 'react';
+import { useNavigate } from "react-router-dom";
 import html2pdf from 'html2pdf.js';
 import "./PageApercuDemande.css";
 
@@ -37,6 +38,7 @@ function fmt(n, decimals = 4) {
 }
 
 export default function PageApercuDemande({idDemande, userRole = "Demandeur", onRetour, donneesInitiales }) {
+    const navigate = useNavigate();
     const [dossierData, setDossierData] = useState(donneesInitiales?.dossierData || null);
     const [detailFraisApproche, setDetailFraisApproche] = useState(donneesInitiales?.detailFraisApproche || null);
     const [articles, setArticles] = useState(donneesInitiales?.articles || []);
@@ -168,6 +170,8 @@ export default function PageApercuDemande({idDemande, userRole = "Demandeur", on
             proportion
         );
 
+        
+
         const valeurCaf = cfr + assurance;
 
         const cours = parseFloat(dossierData.cours) || 0;
@@ -275,7 +279,7 @@ export default function PageApercuDemande({idDemande, userRole = "Demandeur", on
             toast.success("🚀 Traitement enregistré et demande envoyée avec succès au validateur !");
             alert("Demande envoyée avec succès !");
             setTimeout(() => {
-                onRetour();
+                navigate("/home@comptabilite");
             }, 2000);
 
         } catch (err) {
@@ -314,6 +318,8 @@ export default function PageApercuDemande({idDemande, userRole = "Demandeur", on
 
     const fraisapproche = fretValue + droitEtTaxesValue + commissionValueDF + transportLocalDF + assuranceValue;
 
+    const couttot = fraisapproche + (parseFloat(dossierData?.fobTotal))
+
     return (
         <div className="pdf-preview-background">
             <div className="no-print action-bar">
@@ -348,8 +354,8 @@ export default function PageApercuDemande({idDemande, userRole = "Demandeur", on
                     <div className="pdf-lot-info mb-3">
                         {articles.map((art, idx) => (
                             <div key={art.id || idx} className="mb-1">
-                                <strong>Code Lot :</strong> {art.codeLot || "N/A"} &nbsp;&nbsp;
-                                <strong>Désignation :</strong> {art.designation || "N/A"}
+                                <strong>Dossier:</strong> {art.codeLot || "N/A"} &nbsp;&nbsp;
+                                {/* <strong>Désignation :</strong> {art.designation || "N/A"} */}
                             </div>
                         ))}
                     </div>
@@ -377,6 +383,8 @@ export default function PageApercuDemande({idDemande, userRole = "Demandeur", on
                             <td>{dossierData.usine || "Non défini"}</td>
                         </tr>
                         <tr>
+                            <td className="leaf-bold">Cours :</td>
+                            <td>{dossierData.unitcours || "Non défini"}</td>
                        </tr>
                         
                     </tbody>
@@ -385,9 +393,9 @@ export default function PageApercuDemande({idDemande, userRole = "Demandeur", on
                 <table className="table-pdf mb-4">
                     <thead>
                         <tr className="table-row-highlight">
-                            <td className="w-10 leaf-bold">N°</td>
-                            <td className="w-20 leaf-bold">Libellé</td>
-                            <td className="w-20 text-end leaf-bold">% / Valeur CAF</td>
+                            <td className="w-10 leaf-bold"></td>
+                            <td className="w-20 leaf-bold">Mptifs</td>
+                            <td className="w-20 text-end leaf-bold">Taux</td>
                             <td className="w-20 text-end leaf-bold">Montant</td>
                         </tr>
                     </thead>
@@ -410,90 +418,96 @@ export default function PageApercuDemande({idDemande, userRole = "Demandeur", on
                             <td className="text-end">—</td>
                             <td className="w-20 text-end">{fmt(dossierData.mfobTotal)} </td>
                         </tr>
-                        <tr className="table-row-highlight " style={{ backgroundColor: "rgb(226, 223, 22)", fontWeight:"bold" }}>
+                         <tr className="table-row-highlight " style={{ backgroundColor: "yellow" , fontWeight:"bold"}}>
                             <td>4</td>
+                            <td>Assurance (0.2% CFR)</td>
+                            <td className="text-end">{(tauxAssurance * 100).toFixed(1)}%</td>
+                            <td colSpan="2" className="text-end"><strong>{fmtDevise(assuranceValue * (parseFloat(dossierData.cours) || 1))} </strong></td>
+                        </tr>
+                        <tr className="table-row-highlight " style={{ backgroundColor: "rgb(226, 223, 22)", fontWeight:"bold" }}>
+                            <td>5</td>
                             <td>Montant CFR (1+2+3)</td>
                             <td colSpan="2" className=" text-end"><strong>{fmt(montantCFR)} </strong></td>
                         </tr>
                         <tr className="table-row-highlight " style={{ backgroundColor: "yellow" , fontWeight:"bold"}}>
-                            <td>5</td>
+                            <td>6</td>
                             <td>FRET (2+3)</td>
                             <td colSpan="2" className=" text-end"><strong>{fmt(fretValue)} </strong></td>
                         </tr>
                         <tr>
-                            <td>6</td>
+                            <td>7</td>
                             <td>Douanes</td>
                             <td className="text-end">{fmt(detailFraisApproche?.pourcentdouanes || 0)} %</td>
                             <td className="text-end">{fmtDevise(dossierData.douanes)} </td>
                         </tr>
                         <tr>
-                            <td>7</td>
+                            <td>8</td>
                             <td>Prestation GasyNet</td>
                             <td className="text-end">{fmt(detailFraisApproche?.pourcentprestationGasyNet || 0)} %</td>
                             <td className="text-end">{fmtDevise(dossierData.prestationGasyNet)} </td>
                         </tr>
                         <tr>
-                            <td>8</td>
+                            <td>9</td>
                             <td>APMF</td>
                             <td className="text-end">—</td>
                             <td className="text-end">{fmtDevise(dossierData.apmf)} </td>
                         </tr>
                         <tr>
-                            <td>9</td>
+                            <td>10</td>
                             <td>DDP</td>
                             <td className="text-end">—</td>
                             <td className="text-end">{fmtDevise(dossierData.ddp)} </td>
                         </tr>
                         <tr className="table-row-highlight " style={{ backgroundColor: "yellow", fontWeight:"bold" }}>
-                            <td>10</td>
-                            <td>Droit&Taxes (6+7+8+9)</td>
+                            <td>11</td>
+                            <td>Droit&Taxes (7+8+9+10)</td>
                             <td colSpan="2" className="text-end"><strong>{fmt(droitEtTaxesValue)} </strong></td>
                         </tr>
                         <tr>
-                            <td>11</td>
+                            <td>12</td>
                             <td>Débarquement (Transit)</td>
                             <td className="text-end">{fmt(detailFraisApproche?.pourcentdeboursTransit || 0)} %</td>
                             <td className="text-end"><strong>{fmt(dossierData.deboursTransit || 0)} </strong></td>
                         </tr>
                         <tr>
-                            <td>12</td>
+                            <td>13</td>
                             <td>Débours Magasinage</td>
                             <td className="text-end">—</td>
                             <td className="text-end">{fmtDevise(dossierData.deboursMagasinage)} </td>
                         </tr>
                         <tr>
-                            <td>13</td>
+                            <td>14</td>
                             <td>Commission Rémun</td>
                             <td className="text-end">{fmt(detailFraisApproche?.pourcentcommissionRemun || 0)} %</td>
                             <td className="text-end">{fmt((detailFraisApproche?.commissionRemunTranslate || 0) / (parseFloat(dossierData.cours) || 1))} </td>
                         </tr>
                         <tr>
-                            <td>14</td>
+                            <td>15</td>
                             <td>Commission Bancaires</td>
                             <td className="text-end">{fmt(detailFraisApproche?.pourcentcommissionBancaire || 0)} %</td>
                             <td className="text-end">{fmtDevise(dossierData.commissionBancaires)} </td>
                         </tr>
                         <tr className="table-row-highlight " style={{ backgroundColor: "yellow" , fontWeight:"bold"}}>
-                            <td>15</td>
-                            <td>Commission (11+12+13+14)</td>
+                            <td>16</td>
+                            <td>Commission (12+13+14+15)</td>
                             <td colSpan="2" className="text-end"><strong>{fmtDevise(commissionValue)} </strong></td>
                         </tr>
                         <tr>
-                            <td>16</td>
+                            <td>17</td>
                             <td>Transport Local</td>
                             <td className="text-end">{fmt((detailFraisApproche?.pourcentTransport || 0) * (parseFloat(dossierData.tc) || 0))} %</td>
                             <td className="text-end">{fmt((parseFloat(dossierData.transportLocal) || 0) / (parseFloat(dossierData.cours) || 1) * (parseFloat(dossierData.tc) || 0))} </td>
                         </tr>
-                        <tr className="table-row-highlight " style={{ backgroundColor: "yellow" , fontWeight:"bold"}}>
-                            <td>17</td>
-                            <td>Assurance (0.2% CFR)</td>
-                            <td className="text-end">{(tauxAssurance * 100).toFixed(1)}%</td>
-                            <td colSpan="2" className="text-end"><strong>{fmtDevise(assuranceValue * (parseFloat(dossierData.cours) || 1))} </strong></td>
-                        </tr>
+                       
                         <tr className="table-row-highlight " style={{ backgroundColor: "yellow", fontWeight:"bold" }}>
                             <td>18</td>
-                            <td>Frais d'approche total</td>
+                            <td>Frais d'approche(4+6+11+16+17)</td>
                             <td colSpan="2" className="text-end"><strong>{fmt(fraisapproche)} </strong></td>
+                        </tr>
+                        <tr className="table-row-highlight " style={{ backgroundColor: "yellow", fontWeight:"bold" }}>
+                            <td>19</td>
+                            <td>Coût Total (1+18)</td>
+                            <td colSpan="2" className="text-end"><strong>{fmt(couttot)} </strong></td>
                         </tr>
                     </tbody>
                 </table>
@@ -501,12 +515,14 @@ export default function PageApercuDemande({idDemande, userRole = "Demandeur", on
                 <table className="table-articles">
                     <thead>
                         <tr>
-                            <th>Code Lot</th>
-                            <th>Désignation de l'Article</th>
-                            {isCanettes && <th>Type</th>}
+                            <th>Dossier</th>
+                            <th>Article</th>
+                            {/* {isCanettes && <th>Type</th>} */}
                             <th>Code IMMO</th>
-                            <th className="text-end">PU (devise)</th>
                             <th className="text-end">Quantité</th>
+                            <th className="text-end">Unité</th>
+                            <th className="text-end">PU FOB (1/Quantité)</th>
+                            <th className="text-end">PU DDP (19/Quantité)</th>
                             <th className="text-end">PU en Ariary (Ar)</th>
                         </tr>
                     </thead>
@@ -517,14 +533,19 @@ export default function PageApercuDemande({idDemande, userRole = "Demandeur", on
                                 if (art.id.endsWith("#0")) libelleType = "Couvercle";
                                 else if (art.id.endsWith("#1")) libelleType = "Boîte";
                             }
+                            const pufob = (parseFloat(dossierData?.fobTotal) || 0) / (parseFloat(art.quantite) || 1);
+                            const puddp = (couttot) / (parseFloat(art.quantite) || 1);
                             return (
                             <tr key={art.id || index}>
                                 <td>{art.codeLot}</td>
-                                <td>{art.designation}</td>
-                                {isCanettes && <td>{libelleType}</td>}
+                                <td>{art.designation} {isCanettes && {libelleType}}</td>
+                                
                                 <td>{art.immo}</td>
-                                <td className="text-end">{fmt(art.prixUnitaire || 0)} </td>
+                                {/* <td className="text-end">{fmt(art.prixUnitaire || 0)} </td> */}
                                 <td className="text-end">{art.quantite || 0}</td>
+                                <td className="text-end">{art.unite || "Kg"}</td>
+                                <td className="text-end font-monospace-bold">{fmt(pufob)} </td>
+                                <td className="text-end font-monospace-bold">{fmt(puddp)} </td>
                                 <td className="text-end font-monospace-bold">{fmt(art.puAriary)} Ar</td>
                             </tr>
                             );

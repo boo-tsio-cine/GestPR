@@ -10,7 +10,7 @@ import { Button } from "../ui/button";
 import "./demandeur.css";
 import { useAuth } from "../../context/AuthContext";
 import Nav from "../nav/nav";
-import { articleService, demandeService } from "../../services/api";
+import { articleService, demandeService, userService } from "../../services/api";
 import api from "../../services/api";
 import axios from "axios"; // Ensure axios is imported
 
@@ -105,21 +105,46 @@ function Demandeur() {
         }
     };
 
-    const ouvrirPdf = (d) => {
+   const ouvrirPdf = async (d) => {
         if (!d.pdfFileName) {
             toast.error("Aucun PDF disponible pour cette demande");
             return;
         }
-        const baseUrl = api.defaults.baseURL ? new URL(api.defaults.baseURL).origin : "http://localhost:5233";
-        setSelectedPdf(`${baseUrl}/uploads/pdfs/${d.pdfFileName}`);
-        setOpenPdf(true);
+
+        const baseUrl = api.defaults.baseURL 
+            ? new URL(api.defaults.baseURL).origin 
+            : "http://localhost:5233";
+            
+        const pdfUrl = `${baseUrl}/uploads/pdfs/${d.pdfFileName}`;
+
+        try {
+            // 1. On récupère le fichier en brut (ArrayBuffer/Blob) via Axios
+            const response = await axios.get(pdfUrl, {
+                responseType: 'blob' 
+            });
+
+            // 2. On crée un Blob spécifique pour le PDF
+            const blob = new Blob([response.data], { type: 'application/pdf' });
+
+            // 3. On génère une URL locale (blob:http://...) que l'iframe sait lire nativement
+            const localPdfUrl = window.URL.createObjectURL(blob);
+
+            setSelectedPdf(localPdfUrl);
+            setOpenPdf(true);
+        } catch (err) {
+            console.error("Erreur de chargement du PDF :", err);
+            toast.error("Impossible de charger l'aperçu du PDF");
+        }
     };
 
     const fermerPdf = () => {
         setOpenPdf(false);
+        // Important : Libérer la mémoire du navigateur en révoquant l'URL du blob
+        if (selectedPdf && selectedPdf.startsWith("blob:")) {
+            window.URL.revokeObjectURL(selectedPdf);
+        }
         setSelectedPdf("");
     };
-
     // 4. Gestion des formulaires
     const resetForm = () => setLots([emptyLot()]);
 
@@ -132,23 +157,30 @@ function Demandeur() {
     const removeLot = (i) => setLots((a) => (a.length > 1 ? a.filter((_, idx) => idx !== i) : a));
 
     // 5. Hooks d'effets (useEffect)
-    useEffect(() => {
+   useEffect(() => {
         const initialiserComposant = async () => {
+            // Si le contexte d'authentification charge ou si aucun matricule n'est trouvé en local, on patiente
             if (loading || !userMatricule) return;
             
             try {
-                const response = await axios.get(`http://localhost:5233/api/Auth/by-matricule/${userMatricule}`);
-                const dbUserId = response.data.id || response.data.Id;
-                setUserId(dbUserId);
+                // CORRECTION : On passe par l'instance "api" configurée (qui contient withCredentials et l'adresse de prod/locale)
+                // ou directement par le service userService.idMatricule(userMatricule)
+                const response = await userService.idMatricule(userMatricule);
+                
+                const dbUserId = response.data.id ?? response.data.Id;
+                if (dbUserId) {
+                    setUserId(dbUserId);
+                } else {
+                    console.warn("L'ID utilisateur n'a pas pu être extrait de la réponse :", response.data);
+                }
             } catch (err) {
                 console.error("Erreur lors de la récupération de l'ID utilisateur :", err);
-                toast.error("Impossible de lier votre session à la base de données");
+                toast.error("Impossible de lier votre session à la base de données.");
             }
         };
 
         initialiserComposant();
     }, [userMatricule, loading]);
-
    
 
     useEffect(() => {
@@ -182,13 +214,14 @@ function Demandeur() {
         try {
             const payload = {
                 demandeurId: parseInt(userId),
-                motif: "En attente",
+                motif: "",
                 articles: cleanLots.map((lot) => ({
                     codeLot: lot.codeLot,
                     designation: lot.designation
                 }))
             };
 
+            // Envoi à l'API via le service demandeService
             await demandeService.create(payload);
             toast.success(`Demande créée avec ${cleanLots.length} article(s)!`);
 
@@ -238,6 +271,7 @@ function Demandeur() {
                             <FileText className="h-4 w-4" /> Nouvelle demande
                         </Button>
                     </DialogTrigger>
+                   
                     <DialogContent className="dialog_demande_content" overlayClassName="fixed inset-0 bg-black/30 backdrop-blur-sm">
                         <DialogHeader>
                             <DialogTitle>Nouvelle demande</DialogTitle>
@@ -270,6 +304,7 @@ function Demandeur() {
                                                 onChange={(e) => updateLot(i, "designation", e.target.value)}
                                                 required
                                             />
+                                            
                                             <Button
                                                 type="button"
                                                 variant="ghost"
@@ -303,6 +338,7 @@ function Demandeur() {
                         <div>
                             <h1 className="text-3xl font-bold tracking-tight">Mes demandes</h1>
                         </div>
+                        
                     </header>
 
                     <Card className="card">
@@ -403,7 +439,17 @@ function Demandeur() {
                 <Dialog open={openPdf} onOpenChange={setOpenPdf}>
                     <DialogContent className="dialog_demande_content" overlayClassName="fixed inset-0 bg-black/30 backdrop-blur-sm" style={{ maxWidth: '96vw', width: '96vw', maxHeight: '96vh', height: '96vh', display: 'flex', flexDirection: 'column', padding: 0 }}>
                         <DialogHeader style={{ padding: '16px 20px 0' }}>
-                            <DialogTitle>Prévisualisation du PDF</DialogTitle>
+                            <DialogTitle>
+                                <span>Prévisualisation du PDF</span>   
+                                {/* <a 
+                                    href={selectedPdf} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer" 
+                                    className="text-xs text-blue-600 hover:underline mr-8"
+                                >
+                                    Ouvrir dans un nouvel onglet
+                                </a> */}
+                            </DialogTitle>
                         </DialogHeader>
                         <div style={{ flex: 1, minHeight: 0, padding: '12px 20px 20px' }}>
                             {selectedPdf && (

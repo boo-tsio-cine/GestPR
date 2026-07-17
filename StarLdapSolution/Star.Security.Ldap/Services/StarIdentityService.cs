@@ -41,16 +41,17 @@ namespace Star.Security.Ldap
                     connection.Open();
                     var role = command.ExecuteScalar() as string;
 
-                    using (var reader = command.ExecuteReader()) {
+                    using (var reader = command.ExecuteReader())
+                    {
                         if (reader.Read())
                         {
-                            return new UserResult 
-                            { 
-                                Username = username, 
-                                Role = reader["Role"].ToString(), 
-                                Nom = reader["Nom"].ToString(), 
-                                Prenom = reader["Prenom"].ToString(), 
-                                IsAuthenticated = true 
+                            return new UserResult
+                            {
+                                Username = username,
+                                Role = reader["Role"].ToString(),
+                                Nom = reader["Nom"].ToString(),
+                                Prenom = reader["Prenom"].ToString(),
+                                IsAuthenticated = true
                             };
                         }
                     }

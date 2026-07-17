@@ -73,7 +73,7 @@ namespace GestPR.Repository.Demandes
 
         public async Task<bool> UserExistsAsync(int userId)
         {
-            return await _context.Users.AnyAsync(u => u.Id == userId);
+            return await _context.ApplicationUsers.AnyAsync(u => u.Id == userId);
         }
 
         public async Task SaveChangesAsync()
@@ -86,6 +86,13 @@ namespace GestPR.Repository.Demandes
         {
             return await _context.Article
                 .Where(a => a.Designation == designation)
+                .ToListAsync();
+        }
+
+        public async Task<List<ApplicationUser>> GetUsersByRoleAsync(string role)
+        {
+            return await _context.ApplicationUsers
+                .Where(u => u.Role == role && u.IsActive == 1 && !string.IsNullOrEmpty(u.Mail))
                 .ToListAsync();
         }
     }
