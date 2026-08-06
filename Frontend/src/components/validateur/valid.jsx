@@ -35,34 +35,34 @@ export default function Valid() {
     }, []);
 
     const ouvrirDialog = async (d) => {
-    setSelectedDemande(d);
-    setMotif(d.motif || "");
-    setPdfFileName(d.pdfFileName || "");
+        setSelectedDemande(d);
+        setMotif(d.motif || "");
+        setPdfFileName(d.pdfFileName || "");
 
-    if (d.pdfFileName) {
-        try {
-            // ✔️ On appelle directement l'endpoint API GET /api/demandes/{id}/pdf
-            // Axios va automatiquement ajouter la baseURL correcte et le Token d'authentification !
-            const response = await api.get(`/demandes/${d.id}/pdf`, {
-                responseType: "blob",
-            });
+        if (d.pdfFileName) {
+            try {
+                // ✔️ On appelle directement l'endpoint API GET /api/demandes/{id}/pdf
+                // Axios va automatiquement ajouter la baseURL correcte et le Token d'authentification !
+                const response = await api.get(`/demandes/${d.id}/pdf`, {
+                    responseType: "blob",
+                });
 
-            const blob = new Blob([response.data], { type: "application/pdf" });
-            const url = URL.createObjectURL(blob);
-            setCurrentPdfUrl(url);
-        } catch (err) {
-            console.error("Erreur de chargement du PDF via l'API:", err);
+                const blob = new Blob([response.data], { type: "application/pdf" });
+                const url = URL.createObjectURL(blob);
+                setCurrentPdfUrl(url);
+            } catch (err) {
+                console.error("Erreur de chargement du PDF via l'API:", err);
+                setCurrentPdfUrl("");
+                toast.error("Impossible de charger le document PDF.");
+            }
+        } else {
             setCurrentPdfUrl("");
-            toast.error("Impossible de charger le document PDF.");
         }
-    } else {
-        setCurrentPdfUrl("");
-    }
 
-    requestAnimationFrame(() => {
-        dialogRef.current?.showModal();
-    });
-};
+        requestAnimationFrame(() => {
+            dialogRef.current?.showModal();
+        });
+    };
     const fermerDialog = () => {
         if (currentPdfUrl && currentPdfUrl.startsWith("blob:")) {
             URL.revokeObjectURL(currentPdfUrl);

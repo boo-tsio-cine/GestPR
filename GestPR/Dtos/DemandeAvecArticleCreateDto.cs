@@ -47,6 +47,9 @@ namespace GestPR.Dtos
         public IFormFile? PdfFile { get; set; }
         public string Articles { get; set; } = string.Empty;
         public string? Commentaire { get; set; }
+
+        public string? TypeDossier { get; set; }
+        public string? Immo { get; set; }
     }
 
     public class UpdateStatusDto
@@ -59,5 +62,6 @@ namespace GestPR.Dtos
     {
         public int ArticleId { get; set; }
         public decimal PrixDeRevient { get; set; }
+        public string? Immo { get; set; }
     }
 }

@@ -29,7 +29,7 @@ function calcPartProrata(montantGlobal, proportion) {
     return (total * proportion) / 100;
 }
 
-function fmt(n, decimals = 4) {
+function fmt(n, decimals = 2) {
     if (!isFinite(n)) return "0";
     return new Intl.NumberFormat("fr-FR", {
         minimumFractionDigits: decimals,
@@ -267,6 +267,9 @@ export default function PageApercuDemande({idDemande, userRole = "Demandeur", on
                 formData.append("commentaire", donneesInitiales.commentaire);
             }
 
+            formData.append("typeDossier", dossierData.typeDossier || "");
+            formData.append("immo", dossierData.immo || "");
+
             toast.info("Envoi de la demande et enregistrement des prix...");
 
             // 5. Expédition unique au service API révisé
@@ -299,25 +302,41 @@ export default function PageApercuDemande({idDemande, userRole = "Demandeur", on
 
     const assuranceValue = (montantCFR * taux_assurance) / 100;
 
-    const fmtDevise = (val) => {
+    const fmtDevise = (val, decimals = 4) => {
         if (!dossierData?.cours || !val) return "0";
         const valeurAr = parseFloat(val) || 0;
         const valeurDevise = valeurAr / (parseFloat(dossierData.cours) || 1);
-        return new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 4, maximumFractionDigits: 4 }).format(valeurDevise);
+        return new Intl.NumberFormat('fr-FR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(valeurDevise);
     };
 
     const fmtAr = (val) => new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 4, maximumFractionDigits: 4 }).format(val || 0);
 
     const fretValue = (parseFloat(dossierData?.mfobTotal) || 0) + (parseFloat(dossierData?.fretTotal) || 0);
-    const droitEtTaxesValue = ((parseFloat(dossierData?.douanes) || 0) + (parseFloat(dossierData?.prestationGasyNet) || 0) + (parseFloat(dossierData?.apmf) || 0) + (parseFloat(dossierData?.ddp) || 0)) / (parseFloat(dossierData?.cours) || 1);
-    const commissionValue = ((parseFloat(dossierData?.debarquementValue) || 0) + (parseFloat(dossierData?.deboursMagasinage) || 0)) + ((parseFloat(dossierData?.commissionRemun) || 0) + (parseFloat(dossierData?.commissionBancaires) || 0)) + parseFloat(dossierData?.deboursTransit || 0);
-    
+
+    const droitEtTaxesValue = dossierData?.typeDossier === "Aériens"
+        ? ( (parseFloat(dossierData?.douanes) || 0) * (parseFloat(valeurCAF) || 0) / 100 + (parseFloat(dossierData?.prestationGasyNet) || 0) + (parseFloat(dossierData?.autresDat) || 0)) / (parseFloat(dossierData?.cours) || 1)
+        : ( (parseFloat(dossierData?.douanes) || 0) * (parseFloat(valeurCAF) || 0) / 100 + (parseFloat(dossierData?.prestationGasyNet) || 0) + (parseFloat(dossierData?.apmf) || 0) + (parseFloat(dossierData?.ddp) || 0) + (parseFloat(dossierData?.autresDat) || 0) + (parseFloat(dossierData?.autreFrais) || 0)) / (parseFloat(dossierData?.cours) || 1);
+
+    const commissionValue = (parseFloat(detailFraisApproche?.commissionRemunTranslate) || 0) + (parseFloat(dossierData?.commissionBancaires) || 0);
+
+    const deboursIvatoValue = (parseFloat(dossierData?.deboursIvato) || 0) / (parseFloat(dossierData?.cours) || 1);
+    const totalHadValue = (parseFloat(dossierData?.totalHad) || 0) / (parseFloat(dossierData?.cours) || 1);
+    const livraisonValue = (parseFloat(dossierData?.transportLocal) || 0) / (parseFloat(dossierData?.cours) || 1);
+    const fraisArriveeValue = deboursIvatoValue + livraisonValue + totalHadValue;
+    const debarquementValueNonAerien = (parseFloat(dossierData?.deboursMagasinage) || 0) / (parseFloat(dossierData?.cours) || 1) + (parseFloat(dossierData?.deboursTransit) || 0);
 
     const commissionValueDF = commissionValue / (parseFloat(dossierData?.cours) || 1);
-    const transportLocalDF = (parseFloat(dossierData?.transportLocal) || 0) / (parseFloat(dossierData?.cours) || 1);
 
-    const fraisapproche = fretValue + droitEtTaxesValue + commissionValueDF + transportLocalDF + assuranceValue;
+    const tarifLTAValue = (parseFloat(dossierData?.tarifLTA) || 0) / (parseFloat(dossierData?.cours) || 1);
 
+    const fretValueAvecAutreFrais = dossierData?.typeDossier === "Aériens"
+        ? fretValue + (parseFloat(dossierData?.autreFrais) || 0) / (parseFloat(dossierData?.cours) || 1)
+        : fretValue;
+
+    const fraisapproche = dossierData?.typeDossier === "Aériens"
+        ? fretValueAvecAutreFrais + droitEtTaxesValue + fraisArriveeValue + commissionValueDF + assuranceValue + tarifLTAValue
+        : fretValue + droitEtTaxesValue + debarquementValueNonAerien + commissionValueDF + livraisonValue + assuranceValue + tarifLTAValue;
+// + droitEtTaxesValue + commissionValueDF + transportLocalDF + assuranceValue
     const couttot = fraisapproche + (parseFloat(dossierData?.fobTotal))
 
     return (
@@ -367,8 +386,17 @@ export default function PageApercuDemande({idDemande, userRole = "Demandeur", on
                         <tr>
                             <td className="leaf-bold">Type de demande :</td>
                             <td>{dossierData.typeDossier || "Non défini"}</td>
-                            <td className="leaf-bold">Nombre TC :</td>
-                            <td>{dossierData.tc || 0}</td>
+                            {dossierData.typeDossier === "Aériens" ? (
+                                <>
+                                    <td className="leaf-bold">Compagnie:</td>
+                                    <td>{dossierData.compagnie || "Non défini"}</td>
+                                </>
+                            ) : (
+                                <>
+                                    <td className="leaf-bold">Nombre TC :</td>
+                                    <td>{dossierData.tc || 0}</td>
+                                </>
+                            )}
                         </tr>
                         <tr>
                             <td className="leaf-bold">Origine :</td>
@@ -377,15 +405,17 @@ export default function PageApercuDemande({idDemande, userRole = "Demandeur", on
                             <td>{dossierData.frs || "Non défini"}</td>
                         </tr>
                         <tr>
-                            <td className="leaf-bold">Port :</td>
-                            <td>{dossierData.port || "Non défini"}</td>
                             <td className="leaf-bold">Usine :</td>
                             <td>{dossierData.usine || "Non défini"}</td>
-                        </tr>
-                        <tr>
                             <td className="leaf-bold">Cours :</td>
-                            <td>{dossierData.unitcours || "Non défini"}</td>
-                       </tr>
+                            <td>{dossierData.cours} {dossierData.unitcours || "Non défini"}</td>
+                        </tr>
+                        {dossierData.typeDossier !== "Aériens" && (
+                            <tr>
+                                <td className="leaf-bold">Port :</td>
+                                <td>{dossierData.port || "Non défini"}</td>
+                            </tr>
+                        )}
                         
                     </tbody>
                 </table>
@@ -394,120 +424,182 @@ export default function PageApercuDemande({idDemande, userRole = "Demandeur", on
                     <thead>
                         <tr className="table-row-highlight">
                             <td className="w-10 leaf-bold"></td>
-                            <td className="w-20 leaf-bold">Mptifs</td>
-                            <td className="w-20 text-end leaf-bold">Taux</td>
+                            <td className="w-20 leaf-bold">Motifs</td>
                             <td className="w-20 text-end leaf-bold">Montant</td>
+                            <td className="w-20 text-end leaf-bold">Taux</td>
                         </tr>
                     </thead>
                     <tbody>
                         <tr>
                             <td>1</td>
                             <td className="w-20 leaf-bold">Montant FOB</td>
-                            <td className="text-end">—</td>
-                            <td className="w-20 text-end">{fmt(dossierData.fobTotal)} </td>
+                            <td className="w-20 text-end">{fmt(parseFloat(dossierData.fobTotal) || 0)} </td>
+                            <td className="text-end"></td>
                         </tr>
                         <tr>
                             <td>2</td>
                             <td className="w-20 leaf-bold">Fret</td>
-                            <td className="text-end">—</td>
-                            <td className="w-20 text-end">{fmt(dossierData.fretTotal)} </td>
+                            <td className="w-20 text-end">{fmt(parseFloat(dossierData.fretTotal) || 0)} </td>
+                            <td className="text-end"></td>
                         </tr>
                         <tr>
                             <td>3</td>
                             <td className="w-20 leaf-bold">Coût de mise FOB</td>
-                            <td className="text-end">—</td>
-                            <td className="w-20 text-end">{fmt(dossierData.mfobTotal)} </td>
+                            <td className="w-20 text-end">{fmt(parseFloat(dossierData.mfobTotal) || 0)} </td>
+                            <td className="text-end"></td>
                         </tr>
-                         <tr className="table-row-highlight " style={{ backgroundColor: "yellow" , fontWeight:"bold"}}>
+                        <tr>
                             <td>4</td>
-                            <td>Assurance (0.2% CFR)</td>
-                            <td className="text-end">{(tauxAssurance * 100).toFixed(1)}%</td>
-                            <td colSpan="2" className="text-end"><strong>{fmtDevise(assuranceValue * (parseFloat(dossierData.cours) || 1))} </strong></td>
+                            <td>{dossierData.typeDossier === "Aériens" ? "Autre Frais" : "Assurance (0.2% CFR)"}</td>
+                            <td className="text-end">{dossierData.typeDossier === "Aériens" ? fmt((parseFloat(dossierData.autreFrais) || 0) / (parseFloat(dossierData.cours) || 1)) : fmt(assuranceValue * (parseFloat(dossierData.cours) || 1))} </td>
+                            <td className="text-end">{dossierData.typeDossier === "Aériens" ? "" : (tauxAssurance).toFixed(1) + "%"}</td>
                         </tr>
                         <tr className="table-row-highlight " style={{ backgroundColor: "rgb(226, 223, 22)", fontWeight:"bold" }}>
                             <td>5</td>
                             <td>Montant CFR (1+2+3)</td>
-                            <td colSpan="2" className=" text-end"><strong>{fmt(montantCFR)} </strong></td>
+                            <td colSpan="1" className=" text-end"><strong>{fmt(montantCFR)} </strong></td>
+                            <td></td>
                         </tr>
                         <tr className="table-row-highlight " style={{ backgroundColor: "yellow" , fontWeight:"bold"}}>
                             <td>6</td>
                             <td>FRET (2+3)</td>
-                            <td colSpan="2" className=" text-end"><strong>{fmt(fretValue)} </strong></td>
+                            <td colSpan="1" className=" text-end"><strong>{fmt(dossierData.typeDossier === "Aériens" ? fretValueAvecAutreFrais : fretValue)} </strong></td>
+                            <td></td>
                         </tr>
                         <tr>
                             <td>7</td>
                             <td>Douanes</td>
+                            <td className="text-end">{fmt((parseFloat(dossierData.douanes) || 0) * (parseFloat(valeurCAF) || 0) / 100 / (parseFloat(dossierData.cours) || 1))} </td>
                             <td className="text-end">{fmt(detailFraisApproche?.pourcentdouanes || 0)} %</td>
-                            <td className="text-end">{fmtDevise(dossierData.douanes)} </td>
                         </tr>
                         <tr>
                             <td>8</td>
                             <td>Prestation GasyNet</td>
+                            <td className="text-end">{fmt(parseFloat(dossierData.prestationGasyNet/dossierData.cours) || 0 )} </td>
                             <td className="text-end">{fmt(detailFraisApproche?.pourcentprestationGasyNet || 0)} %</td>
-                            <td className="text-end">{fmtDevise(dossierData.prestationGasyNet)} </td>
                         </tr>
+                        {dossierData.typeDossier !== "Aériens" && (
+                            <tr>
+                                <td>9</td>
+                                <td>APMF</td>
+                                <td className="text-end">{fmt(parseFloat(dossierData.apmf/dossierData.cours) || 0)} </td>
+                                <td className="text-end"></td>
+                            </tr>
+                        )}
+                        {dossierData.typeDossier !== "Aériens" && (
+                            <tr>
+                                <td>10</td>
+                                <td>DDP</td>
+                                <td className="text-end">{fmt(parseFloat(dossierData.ddp/dossierData.cours) || 0)} </td>
+                                <td className="text-end"></td>
+                            </tr>
+                        )}
                         <tr>
-                            <td>9</td>
-                            <td>APMF</td>
-                            <td className="text-end">—</td>
-                            <td className="text-end">{fmtDevise(dossierData.apmf)} </td>
-                        </tr>
-                        <tr>
-                            <td>10</td>
-                            <td>DDP</td>
-                            <td className="text-end">—</td>
-                            <td className="text-end">{fmtDevise(dossierData.ddp)} </td>
+                            <td>{dossierData.typeDossier === "Aériens" ? "10" : "11"}</td>
+                            <td>{dossierData.typeDossier === "Aériens" ? "Autre taxes" : "DAT"}</td>
+                            <td className="text-end">{fmt(parseFloat(dossierData.autresDat/dossierData.cours) || 0)} </td>
+                            <td className="text-end"></td>
                         </tr>
                         <tr className="table-row-highlight " style={{ backgroundColor: "yellow", fontWeight:"bold" }}>
-                            <td>11</td>
-                            <td>Droit&Taxes (7+8+9+10)</td>
-                            <td colSpan="2" className="text-end"><strong>{fmt(droitEtTaxesValue)} </strong></td>
-                        </tr>
-                        <tr>
                             <td>12</td>
-                            <td>Débarquement (Transit)</td>
-                            <td className="text-end">{fmt(detailFraisApproche?.pourcentdeboursTransit || 0)} %</td>
-                            <td className="text-end"><strong>{fmt(dossierData.deboursTransit || 0)} </strong></td>
+                            <td>Droit&Taxes ({dossierData.typeDossier === "Aériens" ? "8+9+10" : "7+8+9+10+11"})</td>
+                            <td colSpan="1" className="text-end"><strong>{fmt(droitEtTaxesValue)} </strong></td>
+                            <td></td>
                         </tr>
+                        {dossierData.typeDossier === "Aériens" ? (
+                            <>
+                                <tr>
+                                    <td>13</td>
+                                    <td>Debours ivato</td>
+                                    <td className="text-end"><strong>{fmt(deboursIvatoValue)} </strong></td>
+                                    <td className="text-end"></td>
+                                </tr>
+                                <tr>
+                                    <td>14</td>
+                                    <td>LIVRAISON</td>
+                                    <td className="text-end"><strong>{fmt(livraisonValue)} </strong></td>
+                                    <td className="text-end"></td>
+                                </tr>
+                                <tr>
+                                    <td>15</td>
+                                    <td>had</td>
+                                    <td className="text-end"><strong>{fmt(totalHadValue)} </strong></td>
+                                    <td className="text-end"></td>
+                                </tr>
+                                <tr className="table-row-highlight " style={{ backgroundColor: "yellow", fontWeight:"bold" }}>
+                                    <td >16</td>
+                                    <td>Frais à l'arrivée(13+14+15)</td>
+                                    <td className="text-end">{fmt(fraisArriveeValue)} </td>
+                                    <td className="text-end"></td>
+                                </tr>
+                            </>
+                        ) : (
+                            <>
+                                <tr>
+                                    <td>13</td>
+                                    <td>FRAIS A L'ARRIVEE</td>
+                                    <td className="text-end"><strong>{fmt((dossierData.deboursTransit || 0) * (parseFloat(dossierData.cours) || 1)/dossierData.cours)} </strong></td>
+                                    <td className="text-end"></td>
+                                </tr>
+                                <tr>
+                                    <td>14</td>
+                                    <td>Debours Magasinage</td>
+                                    <td className="text-end"><strong>{fmt(parseFloat(dossierData.deboursMagasinage/dossierData.cours) || 0)} </strong></td>
+                                    <td className="text-end"></td>
+                                </tr>
+                                <tr className="table-row-highlight " style={{ backgroundColor: "yellow", fontWeight:"bold" }}>
+                                    <td >15</td>
+                                    <td>Débarquement(13+14)</td>
+                                    <td className="text-end">{fmt(debarquementValueNonAerien)} </td>
+                                    <td className="text-end"></td>
+                                </tr>
+                            </>
+                        )}
                         <tr>
-                            <td>13</td>
-                            <td>Débours Magasinage</td>
-                            <td className="text-end">—</td>
-                            <td className="text-end">{fmtDevise(dossierData.deboursMagasinage)} </td>
-                        </tr>
-                        <tr>
-                            <td>14</td>
-                            <td>Commission Rémun</td>
-                            <td className="text-end">{fmt(detailFraisApproche?.pourcentcommissionRemun || 0)} %</td>
-                            <td className="text-end">{fmt((detailFraisApproche?.commissionRemunTranslate || 0) / (parseFloat(dossierData.cours) || 1))} </td>
-                        </tr>
-                        <tr>
-                            <td>15</td>
-                            <td>Commission Bancaires</td>
-                            <td className="text-end">{fmt(detailFraisApproche?.pourcentcommissionBancaire || 0)} %</td>
-                            <td className="text-end">{fmtDevise(dossierData.commissionBancaires)} </td>
-                        </tr>
-                        <tr className="table-row-highlight " style={{ backgroundColor: "yellow" , fontWeight:"bold"}}>
                             <td>16</td>
-                            <td>Commission (12+13+14+15)</td>
-                            <td colSpan="2" className="text-end"><strong>{fmtDevise(commissionValue)} </strong></td>
+                            <td>Commission SACORFINA</td>
+                            <td className="text-end">{fmt(parseFloat(detailFraisApproche?.commissionRemunTranslate || 0)/dossierData.cours)} </td>
+                            <td className="text-end">{fmt(detailFraisApproche?.pourcentcommissionRemun || 0)} %</td>
                         </tr>
                         <tr>
                             <td>17</td>
-                            <td>Transport Local</td>
-                            <td className="text-end">{fmt((detailFraisApproche?.pourcentTransport || 0) * (parseFloat(dossierData.tc) || 0))} %</td>
-                            <td className="text-end">{fmt((parseFloat(dossierData.transportLocal) || 0) / (parseFloat(dossierData.cours) || 1) * (parseFloat(dossierData.tc) || 0))} </td>
+                            <td>Commission Bancaires</td>
+                            <td className="text-end">{fmt(parseFloat(dossierData.commissionBancaires/dossierData.cours) || 0)} </td>
+                            <td className="text-end">{fmt(detailFraisApproche?.pourcentcommissionBancaire || 0)} %</td>
                         </tr>
-                       
-                        <tr className="table-row-highlight " style={{ backgroundColor: "yellow", fontWeight:"bold" }}>
+                        <tr className="table-row-highlight " style={{ backgroundColor: "yellow" , fontWeight:"bold"}}>
                             <td>18</td>
-                            <td>Frais d'approche(4+6+11+16+17)</td>
-                            <td colSpan="2" className="text-end"><strong>{fmt(fraisapproche)} </strong></td>
+                            <td>Commission (16+17)</td>
+                            <td colSpan="1" className="text-end"><strong>{fmtDevise(commissionValue, 2)} </strong></td>
+                            <td></td>
+                        </tr>
+                        {dossierData.typeDossier !== "Aériens" && (
+                            <tr>
+                                <td>19</td>
+                                <td>Transport Local</td>
+                                <td className="text-end">{fmt((parseFloat(dossierData.transportLocal/dossierData.cours) || 0) * (parseFloat(dossierData.tc) || 0))} </td>
+                                <td className="text-end"></td>
+                            </tr>
+                        )}
+                        {dossierData.typeDossier === "Aériens" && (
+                            <tr>
+                                <td>19</td>
+                                <td>Tarif LTA</td>
+                                <td className="text-end">{fmt(tarifLTAValue)} </td>
+                                <td className="text-end"></td>
+                            </tr>
+                        )}
+                        <tr className="table-row-highlight " style={{ backgroundColor: "yellow", fontWeight:"bold" }}>
+                            <td>20</td>
+                            <td>Frais d'approche({dossierData.typeDossier === "Aériens" ? "4+7+11+15+19" : "4+6+12+15+18+19"})</td>
+                            <td colSpan="1" className="text-end"><strong>{fmt(fraisapproche)} </strong></td>
+                            <td></td>
                         </tr>
                         <tr className="table-row-highlight " style={{ backgroundColor: "yellow", fontWeight:"bold" }}>
-                            <td>19</td>
-                            <td>Coût Total (1+18)</td>
-                            <td colSpan="2" className="text-end"><strong>{fmt(couttot)} </strong></td>
+                            <td>21</td>
+                            <td>Coût Total (1+20)</td>
+                            <td colSpan="1" className="text-end"><strong>{fmt(couttot)} </strong></td>
+                            <td></td>
                         </tr>
                     </tbody>
                 </table>

@@ -33,6 +33,13 @@ function emptyDossierData(){
         ddp: "",
         controleRadioactive: "",
         autresDat: "",
+        autreFrais: "",
+        desinfecte: "",
+        ravinala: "",
+        totalHad: "",
+        deboursIvato: "",
+        compagnie: "",
+        tarifLTA: "",
     };
 }
 
@@ -231,9 +238,23 @@ export function TraitementDemande(){
         }
     }, [valeurCAF]);
 
+    useEffect(() => {
+        if (dossierData.typeDossier === "Aériens" && dossierData.compagnie) {
+            const tarif = dossierData.compagnie === "14MA" ? 13 * (parseFloat(dossierData.cours) || 0) : 30000;
+            updateDossierField("tarifLTA", round4(tarif));
+        }
+    }, [dossierData.typeDossier, dossierData.compagnie, dossierData.cours]);
+
+    useEffect(() => {
+        if (dossierData.typeDossier === "Aériens" && (dossierData.desinfecte || dossierData.ravinala)) {
+            const deboursIvato = (parseFloat(dossierData.desinfecte) || 0) + (parseFloat(dossierData.ravinala) || 0) + (parseFloat(dossierData.tarifLTA) || 0);
+            updateDossierField("deboursIvato", round4(deboursIvato));
+        }
+    }, [dossierData.typeDossier, dossierData.desinfecte, dossierData.ravinala, dossierData.tarifLTA]);
+
     const detailFraisApproche = useMemo(() => {
         const tc = parseFloat(dossierData.tc) || 0;
-        const clesFrais = ["deboursMagasinage", "commissionBancaires", "prestationGasyNet", "apmf","ddp", "controleRadioactive", "autresDat"];
+        const clesFrais = ["deboursMagasinage", "commissionBancaires", "prestationGasyNet", "apmf","ddp", "controleRadioactive", "autresDat", "autreFrais"];
         
         const deboursTransitTranslate = parseFloat(dossierData.deboursTransit * dossierData.cours) || 0;
         const commissionRemunTranslate = parseFloat(dossierData.commissionRemun * valeurCAF / 100) || 0;
@@ -256,7 +277,7 @@ export function TraitementDemande(){
         const pourcentdouanes = valeurCAF ? parseFloat(douanesTranslate / valeurCAF * 100) : 0;
         const pourcentprestationGasyNet = valeurCAF ? parseFloat(prestationGasyNetTranslate / valeurCAF * 100) : 0;
         
-        const total = round4(maritimeFret + maritimeMfob + totalAutresFrais + deboursTransitTranslate + commissionRemunTranslate + douanesTranslate);
+        const total = (parseFloat(dossierData.mfobTotal*dossierData.cours) || 0) + (parseFloat(dossierData.fretTotal*dossierData.cours) || 0) +dossierData.commissionBancaires/100 +  (parseFloat(dossierData.deboursTransit*dossierData.cours) || 0) +  (parseFloat(dossierData.transportLocal*dossierData.tc) || 0) + (parseFloat(dossierData.commissionRemun * valeurCAF /100) || 0) + (parseFloat(dossierData.douanes * valeurCAF /100) || 0) +  (parseFloat(dossierData.prestationGasyNet) || 0) +  (parseFloat(dossierData.apmf) || 0) +  (parseFloat(dossierData.ddp) || 0) +  (parseFloat(dossierData.controleRadioactive) || 0) +  (parseFloat(dossierData.autresDat) || 0) + (parseFloat(dossierData.tarifLTA) || 0) + (parseFloat(dossierData.autreFrais) || 0) + (parseFloat(dossierData.totalHad) || 0) + (parseFloat(dossierData.deboursIvato) || 0);
 
         return {
             deboursTransitTranslate,
@@ -497,17 +518,28 @@ export function TraitementDemande(){
                                           <option value="Sucre">Sucre</option>
                                       </select>
                                  </div>
-                                 <div className="col-md-4">
-                                     <label className="form-label">Nombre TC</label>
-                                     <input
-                                        type="number"
-                                        step="0.01"
-                                        className="form-control"
-                                        value={dossierData.tc}
-                                        onChange={(e) => updateDossierField("tc", e.target.value)}
-                                        required
-                                        />
-                                 </div>
+                                  {dossierData.typeDossier === "Aériens" ? (
+                                      <div className="col-md-4">
+                                          <label className="form-label">Compagnie <small className="text-muted fw-normal"></small></label>
+                                          <select className="form-select" value={dossierData.compagnie} onChange={(e) => updateDossierField("compagnie", e.target.value)}>
+                                              <option value="">Sélectionner</option>
+                                              <option value="12IV">12IV</option>
+                                              <option value="14MA">14MA</option>
+                                          </select>
+                                      </div>
+                                  ) : (
+                                      <div className="col-md-4">
+                                          <label className="form-label">Nombre TC</label>
+                                          <input
+                                             type="number"
+                                             step="0.01"
+                                             className="form-control"
+                                             value={dossierData.tc}
+                                             onChange={(e) => updateDossierField("tc", e.target.value)}
+                                             required
+                                             />
+                                     </div>
+                                  )}
                                   <div className="col-md-4">
                                       <label className="form-label">Origine</label>
                                       <select name="origine" className="form-control" value={dossierData.origine || ""} onChange={(e) => updateDossierField("origine", e.target.value)}>
@@ -532,14 +564,16 @@ export function TraitementDemande(){
                                          ))}
                                      </select>
                                  </div>
-                             <div className="col-md-4">
-                                     <label className="form-label">Port</label>
-                                     <select name="port" className="form-control" value={dossierData.port} onChange={(e) => updateDossierField("port", e.target.value)}>
-                                         <option value="">Sélectionner le port</option>
-                                         <option value="Diégo">Diégo</option>
-                                         <option value="Tamatave">Tamatave</option>
-                                     </select>
-                                 </div>
+                                  {dossierData.typeDossier !== "Aériens" && (
+                                  <div className="col-md-4">
+                                          <label className="form-label">Port</label>
+                                          <select name="port" className="form-control" value={dossierData.port} onChange={(e) => updateDossierField("port", e.target.value)}>
+                                              <option value="">Sélectionner le port</option>
+                                              <option value="Diégo">Diégo</option>
+                                              <option value="Tamatave">Tamatave</option>
+                                          </select>
+                                      </div>
+                                  )}
                                  <div className="col-md-4">
                                      <label className="form-label">Usine</label>
                                      <select name="usine" className="form-control" value={dossierData.usine} onChange={(e) => updateDossierField("usine", e.target.value)}>
@@ -582,7 +616,12 @@ export function TraitementDemande(){
                                     <label className="form-label">Fret</label>
                                     <input type="number" step="0.01" className="form-control" value={dossierData.fretTotal} onChange={(e) => updateDossierField("fretTotal", e.target.value)} required />
                                 </div>
-                                <div className="col-md-4"></div>
+                                {dossierData.typeDossier === "Aériens" && (
+                                    <div className="col-md-4">
+                                        <label className="form-label">Autre Frais <small className="text-muted fw-normal">(Ar)</small></label>
+                                        <input type="number" step="0.01" className="form-control" value={dossierData.autreFrais} onChange={(e) => updateDossierField("autreFrais", e.target.value)} />
+                                    </div>
+                                )}
                                 <div className="col-md-4">
                                     <label className="form-label">Valeur CAF totale (Ar)</label>
                                     <input type="number" step="0.01" className="form-control" value={valeurCAF} readOnly />
@@ -601,25 +640,31 @@ export function TraitementDemande(){
                         <div className="card mt-1 ">
                             <h4>Détail des frais d'approche</h4>
                             <div className="row g-3">
+                                {dossierData.typeDossier !== "Aériens" && (
+                                    <div className="col-md-4">
+                                        <label className="form-label">Frais à l'arrivée <small className="text-muted fw-normal">(devise)</small></label>
+                                        <input type="number" step="0.01" className="form-control" value={dossierData.deboursTransit} onChange={(e) => updateDossierField("deboursTransit", e.target.value)} />
+                                    </div>
+                                )}
+                                {dossierData.typeDossier !== "Aériens" && (
+                                    <div className="col-md-4">
+                                        <label className="form-label">Débours Magasinage <small className="text-muted fw-normal">(Ar)</small></label>
+                                        <input type="number" step="0.01" className="form-control" value={dossierData.deboursMagasinage} onChange={(e) => updateDossierField("deboursMagasinage", e.target.value)} />
+                                    </div>
+                                )}
+                                {dossierData.typeDossier !== "Aériens" && (
+                                    <div className="col-md-4">
+                                        <label className="form-label">Transport Local <small className="text-muted fw-normal">(Ar)</small></label>
+                                        <input type="number" step="0.01" className="form-control" value={dossierData.transportLocal} onChange={(e) => updateDossierField("transportLocal", e.target.value)} />
+                                    </div>
+                                )}
                                 <div className="col-md-4">
-                                    <label className="form-label">Frais à l'arrivée <small className="text-muted fw-normal">(devise)</small></label>
-                                    <input type="number" step="0.01" className="form-control" value={dossierData.deboursTransit} onChange={(e) => updateDossierField("deboursTransit", e.target.value)} />
-                                </div>
-                                <div className="col-md-4">
-                                    <label className="form-label">Débours Magasinage <small className="text-muted fw-normal">(Ar)</small></label>
-                                    <input type="number" step="0.01" className="form-control" value={dossierData.deboursMagasinage} onChange={(e) => updateDossierField("deboursMagasinage", e.target.value)} />
-                                </div>
-                                <div className="col-md-4">
-                                    <label className="form-label">Transport Local <small className="text-muted fw-normal">(Ar)</small></label>
-                                    <input type="number" step="0.01" className="form-control" value={dossierData.transportLocal} onChange={(e) => updateDossierField("transportLocal", e.target.value)} />
-                                </div>
-                                <div className="col-md-4">
-                                    <label className="form-label">Commission SACOFRINA <small className="text-muted fw-normal">(%)</small></label>
+                                    <label className="form-label">Commission SACOFRINA <small className="text-muted fw-normal">(%)</small> </label>
                                     <input type="number" step="0.01" className="form-control" value={dossierData.commissionRemun} onChange={(e) => updateDossierField("commissionRemun", e.target.value)} />
                                 </div>
                                 <div className="col-md-4">
                                     <label className="form-label">Commission Bancaires <small className="text-muted fw-normal">(Ar)</small></label>
-                                    <input type="number" step="0.01" className="form-control" value={dossierData.commissionBancaires} readOnly />
+                                    <input type="number" step="0.01" className="form-control" value={round4(dossierData.commissionBancaires / 100)} readOnly />
                                 </div>
                                 <div className="col-md-4">
                                     <label className="form-label">Douanes <small className="text-muted fw-normal">(%)</small></label>
@@ -629,22 +674,53 @@ export function TraitementDemande(){
                                     <label className="form-label">Prestation GasyNet <small className="text-muted fw-normal">(Ar)</small></label>
                                     <input type="number" step="0.01" className="form-control" value={dossierData.prestationGasyNet} onChange={(e) => updateDossierField("prestationGasyNet", e.target.value)} />
                                 </div>
+                                {dossierData.typeDossier !== "Aériens" && (
+                                    <div className="col-md-4">
+                                        <label className="form-label">APMF <small className="text-muted fw-normal">(Ar)</small></label>
+                                        <input type="number" step="0.01" className="form-control" value={dossierData.apmf} onChange={(e) => updateDossierField("apmf", e.target.value)} />
+                                    </div>
+                                )}
+                                {dossierData.typeDossier !== "Aériens" && (
+                                    <div className="col-md-4">
+                                        <label className="form-label">DDP <small className="text-muted fw-normal">(Ar)</small></label>
+                                        <input type="number" step="0.01" className="form-control" value={dossierData.ddp} onChange={(e) => updateDossierField("ddp", e.target.value)} />
+                                    </div>
+                                )}
+                                {dossierData.typeDossier !== "Aériens" && (
+                                    <div className="col-md-4">
+                                        <label className="form-label">Contrôle Radioactive <small className="text-muted fw-normal">(Ar)</small></label>
+                                        <input type="number" step="0.01" className="form-control" value={dossierData.controleRadioactive} onChange={(e) => updateDossierField("controleRadioactive", e.target.value)} />
+                                    </div>
+                                )}
                                 <div className="col-md-4">
-                                    <label className="form-label">APMF <small className="text-muted fw-normal">(Ar)</small></label>
-                                    <input type="number" step="0.01" className="form-control" value={dossierData.apmf} onChange={(e) => updateDossierField("apmf", e.target.value)} />
-                                </div>
-                                <div className="col-md-4">
-                                    <label className="form-label">DDP <small className="text-muted fw-normal">(Ar)</small></label>
-                                    <input type="number" step="0.01" className="form-control" value={dossierData.ddp} onChange={(e) => updateDossierField("ddp", e.target.value)} />
-                                </div>
-                                <div className="col-md-4">
-                                    <label className="form-label">Contrôle Radioactive <small className="text-muted fw-normal">(Ar)</small></label>
-                                    <input type="number" step="0.01" className="form-control" value={dossierData.controleRadioactive} onChange={(e) => updateDossierField("controleRadioactive", e.target.value)} />
-                                </div>
-                                <div className="col-md-4">
-                                    <label className="form-label">Autres DAT <small className="text-muted fw-normal">(Ar)</small></label>
+                                    <label className="form-label">{dossierData.typeDossier === "Aériens" ? "Autre taxe" : "Autres DAT"} <small className="text-muted fw-normal">(Ar)</small></label>
                                     <input type="number" step="0.01" className="form-control" value={dossierData.autresDat} onChange={(e) => updateDossierField("autresDat", e.target.value)} />
                                 </div>
+
+                                {dossierData.typeDossier === "Aériens" && (
+                                    <>
+                                        <div className="col-md-4">
+                                            <label className="form-label">Desinfecte <small className="text-muted fw-normal">(Ar)</small></label>
+                                            <input type="number" step="0.01" className="form-control" value={dossierData.desinfecte} onChange={(e) => updateDossierField("desinfecte", e.target.value)} />
+                                        </div>
+                                        <div className="col-md-4">
+                                            <label className="form-label">Ravinala <small className="text-muted fw-normal">(Ar)</small></label>
+                                            <input type="number" step="0.01" className="form-control" value={dossierData.ravinala} onChange={(e) => updateDossierField("ravinala", e.target.value)} />
+                                        </div>
+                                        <div className="col-md-4">
+                                            <label className="form-label">Total Had <small className="text-muted fw-normal">(Ar)</small></label>
+                                            <input type="number" step="0.01" className="form-control" value={dossierData.totalHad} onChange={(e) => updateDossierField("totalHad", e.target.value)} />
+                                        </div>
+                                        <div className="col-md-4">
+                                            <label className="form-label">Débours Ivato <small className="text-muted fw-normal">(Ar)</small></label>
+                                            <input type="number" step="0.01" className="form-control" value={dossierData.deboursIvato} readOnly />
+                                        </div>
+                                        <div className="col-md-4">
+                                            <label className="form-label">Tarif LTA <small className="text-muted fw-normal">(Ar)</small></label>
+                                            <input type="number" step="0.01" className="form-control" value={dossierData.tarifLTA} readOnly />
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </div>
 
@@ -716,9 +792,12 @@ export function TraitementDemande(){
                                                                 value={saisie.unite}
                                                                 onChange={(e) => updateSaisieArticle(rowKey, "unite", e.target.value)}
                                                             >
+                                                                <option value="EA">EA</option>
+                                                                <option value="HL">HL</option>
                                                                 <option value="Kg">Kg</option>
-                                                                <option value="LTA">LTA</option>
+                                                                <option value="LTS">LTS</option>
                                                                 <option value="T">T</option>
+                                                                <option value="U">U</option>
                                                             </select>
                                                         </div>
                                                     </td>

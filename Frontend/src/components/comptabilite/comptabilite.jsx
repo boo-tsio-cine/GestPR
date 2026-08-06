@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { articleService, demandeService, userService } from "../../services/api";
+import api from "../../services/api";
 import CrudPage from "../../page/crud_page";
 import { Card, CardContent, CardHeader } from "../ui/Cards";
 import Input from "../ui/input";
@@ -10,7 +11,6 @@ import { Eye} from "lucide-react";
 import Nav from "../nav/nav";
 import "./comptabilite.css";
 import { Link } from "react-router-dom";
-
 
 
 function Comptabilite(){
@@ -54,6 +54,7 @@ function Comptabilite(){
                     status: d.status ?? d.Status ?? "Nouvelle",
                     date: d.dateTime ?? d.DateTime,
                     demandeurId: idDuDemandeur,
+                    pdfFileName: d.pdfFileName ?? d.PdfFileName ?? d.pdf ?? d.Pdf ?? "",
 
                     site: utilisateurTrouve ? (utilisateurTrouve.site || utilisateurTrouve.Site || "") : "",
 
@@ -93,7 +94,6 @@ function Comptabilite(){
     useEffect(()=>{
         fetchDemandes();
     }, [])
-
 
 
 
@@ -204,99 +204,200 @@ function Comptabilite(){
     </>
 }
 
-function DemandesTable({ data, empty }) {
+function DemandesTable({ data, empty, onDetail }) {
+    const [selectedDemande, setSelectedDemande] = useState(null);
+    const [currentPdfUrl, setCurrentPdfUrl] = useState("");
+    const [pdfFileName, setPdfFileName] = useState("");
+    const [motif, setMotif] = useState("");
+    const dialogRef = useRef(null);
+
+    const ouvrirDialog = async (d) => {
+        setSelectedDemande(d);
+        setMotif(d.motif || "");
+        setPdfFileName(d.pdfFileName || "");
+
+        if (d.pdfFileName) {
+            try {
+                const response = await api.get(`/demandes/${d.id}/pdf`, {
+                    responseType: "blob",
+                });
+
+                const blob = new Blob([response.data], { type: "application/pdf" });
+                const url = URL.createObjectURL(blob);
+                setCurrentPdfUrl(url);
+            } catch (err) {
+                console.error("Erreur de chargement du PDF via l'API:", err);
+                setCurrentPdfUrl("");
+                toast.error("Impossible de charger le document PDF.");
+            }
+        } else {
+            setCurrentPdfUrl("");
+        }
+
+        requestAnimationFrame(() => {
+            dialogRef.current?.showModal();
+        });
+    };
+
+    const fermerDialog = () => {
+        if (currentPdfUrl && currentPdfUrl.startsWith("blob:")) {
+            URL.revokeObjectURL(currentPdfUrl);
+        }
+        dialogRef.current?.close();
+        setSelectedDemande(null);
+        setCurrentPdfUrl("");
+        setPdfFileName("");
+        setMotif("");
+    };
+
+    const telechargerPdf = () => {
+        if (!currentPdfUrl || !pdfFileName) return;
+
+        const a = document.createElement("a");
+        a.href = currentPdfUrl;
+        a.download = pdfFileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    };
+
     if (data.length === 0) {
         return <p className="py-6 text-center text-sm text-muted-foreground">{empty}</p>;
     }
-    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    const date= new Date().toLocaleDateString('fr-FR', options)
-    return (
-        
-        <div className="w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm ">
-            <div className="title">
-                Demande à traiter
-            </div>
-            {data.map((d) => (
-                // const idFormate = String(d.id).padStart(3, '0');
 
-                <div className=" card-dem" key = {d.id}>
-                    <div className="card-head">
-                        <time>{d.date ? new Date(d.date).toLocaleDateString('fr-FR') : "Date inconnue"}</time>
-                        <div>DEM-
-                            {   d.id < 10 
-                                ? `00${d.id}` 
-                                : d.id < 100 
-                                    ? `0${d.id}` 
-                                    : d.id
-                            }
+    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    const date = new Date().toLocaleDateString('fr-FR', options);
+
+    return (
+        <>
+            <div className="w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm ">
+                <div className="title">
+                    Demande à traiter
+                </div>
+                {data.map((d) => (
+                    <div className=" card-dem" key={d.id}>
+                        <div className="card-head">
+                            <time>{d.date ? new Date(d.date).toLocaleDateString('fr-FR') : "Date inconnue"}</time>
+                            <div>DEM-
+                                {d.id < 10 
+                                    ? `00${d.id}` 
+                                    : d.id < 100 
+                                        ? `0${d.id}` 
+                                        : d.id}
+                            </div>
+                            <data
+                                value="completed"
+                                className="status-badge"
+                                style={{
+                                    backgroundColor: d.status === "Nouvelle" ? "#a9caf5" : d.status === "En attente" ? "#FEF9C3" : d.status === "Validée" ? "#DCFCE7" : "#FFE4E6",
+                                    color: d.status === "Nouvelle" ? "#000927" : d.status === "En attente" ? "#854D0E" : d.status === "Validée" ? "#166534" : "#9F1239",
+                                    width:'8rem',
+                                    height:'100%',
+                                    borderRadius:'5px',
+                                    textAlign:'center'
+                                }}
+                            >{d.status}</data>
                         </div>
-                        <data
-                            value="completed"
-                            className="status-badge"
-                            style={{
-                                backgroundColor: d.status === "Nouvelle" ? "#a9caf5" : d.status === "En attente" ? "#FEF9C3" : d.status === "Validée" ? "#DCFCE7" : "#FFE4E6",
-                                color: d.status === "Nouvelle" ? "#000927" : d.status === "En attente" ? "#854D0E" : d.status === "Validée" ? "#166534" : "#9F1239",
-                                width:'8rem',
-                                height:'100%',
-                                borderRadius:'5px',
-                                textAlign:'center'
-                            }}
-                        >{d.status}</data>
-                    </div>
-                    <div className="card-desc">
-                        
-                        <div className="card-site">
-                            <div>{d.site || "Site inconnu"}</div>
-                        </div>
-                        <div className="card-id">
-                            <p>{d.nomDemandeur} {d.prenomDemandeur}</p>
-                            <p>{d.matricule}</p>
-                        </div>
-                        <div className="card-table">
-                            <div className="w-full overflow-hidden rounded-xl  border-gray-200 bg-white shadow-sm">
-                                <Table className="table">
-                                    
-                                    <TableBody className="divide-y divide-gray-100">
-                                        {
-                                            d.lots && d.lots.length > 0 ? (
+                        <div className="card-desc">
+                            <div className="card-site">
+                                <div>{d.site || "Site inconnu"}</div>
+                            </div>
+                            <div className="card-id">
+                                <p>{d.nomDemandeur} {d.prenomDemandeur}</p>
+                                <p>{d.matricule}</p>
+                            </div>
+                            <div className="card-table">
+                                <div className="w-full overflow-hidden rounded-xl border-gray-200 bg-white shadow-sm">
+                                    <Table className="table">
+                                        <TableBody className="divide-y divide-gray-100">
+                                            {d.lots && d.lots.length > 0 ? (
                                                 d.lots.map((article) => (
-                                                    // Toujours fournir une clé unique 'key' lors d'un .map() dans React
                                                     <TableRow key={article.id} className="transition-colors hover:bg-gray-50">
                                                         <TableCell className="px-4 py-3 text-sm text-gray-600">
                                                             {article.codeLot}
                                                         </TableCell>
-                                                        
                                                         <TableCell className="px-4 py-3 status">
                                                             {article.designation}
                                                         </TableCell>
                                                     </TableRow>
                                                 ))
                                             ) : (
-                                                // Message si la demande n'a mystérieusement aucun article
-                                            <TableRow>
-                                                <TableCell colSpan={2} className="px-4 py-3 text-sm text-center text-gray-400">
-                                                    Aucun article pour cette demande
-                                                </TableCell>
-                                            </TableRow>
-                                            )
-                                        }
-                                    </TableBody>
-                                </Table>
+                                                <TableRow>
+                                                    <TableCell colSpan={2} className="px-4 py-3 text-sm text-center text-gray-400">
+                                                        Aucun article pour cette demande
+                                                    </TableCell>
+                                                </TableRow>
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            </div>
+                            <div className="card-link">
+                                {d.status === "Nouvelle" ? (
+                                    <Link className="btn btn-success text-white" to={`/traiter-demande/${d.id}`} style={{ display:'inline-block', textDecoration:'none'}}>
+                                        Traiter la demande
+                                    </Link>
+                                ) : (
+                                    <button 
+                                        className="btn text-white"
+                                        onClick={() => ouvrirDialog(d)}
+                                        style={{ 
+                                            display:'inline-block', 
+                                            textDecoration:'none',
+                                            background:'rgb(114, 157, 165)',
+                                            border: 'none',
+                                            padding: '10px 18px',
+                                            borderRadius: '4px',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        Voir la fiche 
+                                    </button>
+                                )}
                             </div>
                         </div>
-                        <div className="card-link">
-                            {d.status === "Nouvelle" && (
-                                <Link className="btn btn-success text-white" to={`/traiter-demande/${d.id}`} style={{ display:'inline-block', textDecoration:'none'}}>
-                                    Traiter la demande
-                                </Link>
+                    </div>
+                ))}
+            </div>
+
+            <dialog 
+                ref={dialogRef} 
+               className="fiche-dialog"
+            >
+                {selectedDemande && (
+                    <>
+                        <div className="d-flex justify-content-between align-items-center mb-2">
+                            <h5 className="m-0">Traitement de la demande DEM-{String(selectedDemande.id).padStart(3, '0')}</h5>
+                            <div className="d-flex gap-2">
+                                {currentPdfUrl && (
+                                    <button 
+                                        className="btn btn-success btn-sm"
+                                        onClick={telechargerPdf}
+                                        title="Télécharger le PDF"
+                                    >
+                                        📥 Télécharger
+                                    </button>
+                                )}
+                                <button className="btn btn-close" onClick={fermerDialog}></button>
+                            </div>
+                        </div>
+                        
+                        <div className="mb-2" style={{ flex: 1, minHeight: 0 }}>
+                            {currentPdfUrl ? (
+                                <iframe 
+                                    key={currentPdfUrl}
+                                    src={currentPdfUrl} 
+                                    style={{ width: '100%', height: '100%', border: 'none' }}
+                                    title="Aperçu PDF"
+                                />
+                            ) : (
+                                <div className="alert alert-warning">Aucun document PDF disponible pour cette demande.</div>
                             )}
                         </div>
-                    </div>
-                </div>
-                ))
-            }
-          
-        </div>
+                    </>
+                )}
+            </dialog>
+        </>
     );
 }
 

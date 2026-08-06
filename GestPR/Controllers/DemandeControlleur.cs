@@ -72,8 +72,8 @@ namespace GestPR.Controllers
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> SoumettreTraitement([FromRoute] int id, [FromForm] SoumettreDemandeDto dto)
         {
-            // On extrait les valeurs du DTO pour les passer au service existant
-            var reussite = await _service.SoumettreDemandeAsync(id, dto.PdfFile, dto.Articles, dto.Commentaire);
+            // Transmettre dto.Immo au service
+            var reussite = await _service.SoumettreDemandeAsync(id, dto.PdfFile, dto.Articles, dto.Commentaire, dto.TypeDossier, dto.Immo);
             if (!reussite) return NotFound("Demande introuvable");
 
             return Ok(new { message = "Traitement, commentaire enregistrés, prix sauvegardés et statut mis à jour à 'En cours'" });

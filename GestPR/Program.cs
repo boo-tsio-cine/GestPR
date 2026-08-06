@@ -126,6 +126,7 @@ namespace GestPR
 
             // Dans Program.cs
             builder.Services.AddTransient<IEmailService, EmailService>();
+            builder.Services.AddHttpContextAccessor();
 
 
             // =========================================================
