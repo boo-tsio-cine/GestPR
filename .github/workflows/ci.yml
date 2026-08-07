@@ -35,6 +35,11 @@ jobs:
         run: dotnet build --no-restore --configuration Release
         working-directory: ./GestPR
 
+      # Step 5 : Exécuter les tests unitaires
+      - name: Exécution des tests unitaires
+        run: dotnet test --no-build --verbosity normal
+        working-directory: ./GestPR
+
   # JOB 2 : Compilation du Frontend React
   build-frontend:
     runs-on: ubuntu-latest
@@ -52,12 +57,14 @@ jobs:
 
     # Step 3 : Installer les modules npm dans le dossier client
     - name: Installation des dépendances NPM
-      run: |
-        cd client
-        npm ci
+      run: npm install
+      working-directory: ./client
 
     # Step 4 : Vérifier le build de l'application React
     - name: Build de l'application React
-      run: |
-        cd client
-        npm run build
+      run: npm run build
+      working-directory: ./client
+
+    - name : Executions des tests React
+      run: npm test -- --watchAll=false
+      working-directory: ./client
