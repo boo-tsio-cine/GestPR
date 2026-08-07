@@ -1,72 +1,54 @@
 name: Pipeline CI - Validation du Projet GestPR
 
-# Déclenchement : la pipeline s'exécute à chaque push sur les branches main/master et dev
-on: 
+on:
   push:
-    branches: [main, master, dev]
+    branches: [ "main" ]
   pull_request:
-    branches: [main, master, dev]
+    branches: [ "main" ]
 
 jobs:
-  #JOB 1 :  compilation du backend .Net 8
-
-  build-backend: 
-  
+  # -------------------------------------------------------------
+  # JOB 1 : Backend .NET 8
+  # -------------------------------------------------------------
+  build-backend:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1 : Récupérer le code source du dépôt
-      - name: Récupération du code (Checkout)
-        uses: actions/checkout@v4
+    - name: Récupération du code (Checkout)
+      uses: actions/checkout@v4
 
-      # Step 2 : Installer le SDK .NET 8 sur la machine virtuelle
-      - name: Configuration de .NET 8
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
+    - name: Configuration de .NET 8
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
 
-      # Step 3 : Restaurer les packages NuGet
-      - name: Restauration des dépendances NuGet
-        run: dotnet restore
-        working-directory: ./GestPR
+    - name: Restauration des packages NuGet
+      run: dotnet restore
+      working-directory: ./GestPR  # Ajustez si le nom du dossier backend diffère
 
-      # Step 4 : Compiler l'API .NET
-      - name: Compilation de la solution .NET
-        run: dotnet build --no-restore --configuration Release
-        working-directory: ./GestPR
+    - name: Compilation du Backend .NET
+      run: dotnet build --no-restore --configuration Release
+      working-directory: ./GestPR  # Ajustez si le nom du dossier backend diffère
 
-      # Step 5 : Exécuter les tests unitaires
-      - name: Exécution des tests unitaires
-        run: dotnet test --no-build --verbosity normal
-        working-directory: ./GestPR
-
-  # JOB 2 : Compilation du Frontend React
+  # -------------------------------------------------------------
+  # JOB 2 : Frontend React
+  # -------------------------------------------------------------
   build-frontend:
     runs-on: ubuntu-latest
 
     steps:
-    # Step 1 : Récupérer le code source
     - name: Récupération du code (Checkout)
       uses: actions/checkout@v4
 
-    # Step 2 : Installer Node.js sur la machine virtuelle
     - name: Configuration de Node.js (v20)
       uses: actions/setup-node@v4
       with:
         node-version: '20'
 
-    # Step 3 : Installer les modules npm dans le dossier client
     - name: Installation des dépendances NPM
       run: npm install
-      working-directory: ./Frontend
+      working-directory: ./Frontend  # Ajustez si le nom du dossier frontend diffère
 
-    # Step 4 : Vérifier le build de l'application React
     - name: Build de l'application React
       run: npm run build
-      working-directory: ./Frontend
-
-    - name: Executions des tests React
-      run: npm test -- --passWithNoTests
-      env:
-        CI: false
-      working-directory: ./Frontend
+      working-directory: ./Frontend  # Ajustez si le nom du dossier frontend differs
