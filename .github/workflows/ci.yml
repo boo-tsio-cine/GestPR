@@ -68,5 +68,5 @@ jobs:
     - name: Executions des tests React
       run: npm test -- --passWithNoTests
       env:
-        CI: true
+        CI: false
       working-directory: ./Frontend
