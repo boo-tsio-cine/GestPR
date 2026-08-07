@@ -58,13 +58,13 @@ jobs:
     # Step 3 : Installer les modules npm dans le dossier client
     - name: Installation des dépendances NPM
       run: npm install
-      working-directory: ./client
+      working-directory: ./Frontend
 
     # Step 4 : Vérifier le build de l'application React
     - name: Build de l'application React
       run: npm run build
-      working-directory: ./client
+      working-directory: ./Frontend
 
     - name : Executions des tests React
       run: npm test -- --watchAll=false
-      working-directory: ./client
+      working-directory: ./Frontend
