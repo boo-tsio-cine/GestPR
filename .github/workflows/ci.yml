@@ -65,8 +65,8 @@ jobs:
       run: npm run build
       working-directory: ./Frontend
 
-    # - name : Executions des tests React
-    #   run: npm test -- --watchAll=false
-    #   working-directory: ./Frontend
-    #   env:
-    #     CI: true
+    - name: Executions des tests React
+      run: npm test -- --passWithNoTests
+      env:
+        CI: true
+      working-directory: ./Frontend
