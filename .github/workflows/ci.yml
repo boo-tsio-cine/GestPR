@@ -28,10 +28,12 @@ jobs:
       # Step 3 : Restaurer les packages NuGet
       - name: Restauration des dépendances NuGet
         run: dotnet restore
+        working-directory: ./GestPR
 
       # Step 4 : Compiler l'API .NET
       - name: Compilation de la solution .NET
         run: dotnet build --no-restore --configuration Release
+        working-directory: ./GestPR
 
   # JOB 2 : Compilation du Frontend React
   build-frontend:
