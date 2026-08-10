@@ -128,6 +128,7 @@ namespace GestPR
             builder.Services.AddTransient<IEmailService, EmailService>();
             builder.Services.AddHttpContextAccessor();
 
+            builder.Services.AddDistributedMemoryCache();
 
             // =========================================================
             // 2. MIDDLEWARES PIPELINE

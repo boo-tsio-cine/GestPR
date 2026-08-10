@@ -3,6 +3,8 @@ using GestPR.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
+using System.Text.Json;
 
 namespace GestPR.Controllers
 {
@@ -12,7 +14,15 @@ namespace GestPR.Controllers
     {
         private readonly AppDbContext _context;
 
-        public ArticleController(AppDbContext context) {  _context = context; }
+        private readonly IDistributedCache _cache;
+
+        public ArticleController(AppDbContext context, IDistributedCache cache) 
+        {  
+            _context = context;
+            _cache = cache; 
+        }
+
+
 
         // POST: api/articles — enregistrer un article
         [HttpPost]
@@ -51,6 +61,38 @@ namespace GestPR.Controllers
                 .ToListAsync();
 
             return Ok(articles);
+        }
+
+        [HttpGet("categories")]
+        public async Task<ActionResult> GetCategories()
+        {
+           string cacheKey = "article_categories";
+
+            // 1. Recherche dans le cache RAM
+            var cacheData = await _cache.GetStringAsync(cacheKey);
+            if(!string.IsNullOrEmpty(cacheData))
+            {
+                var categoriesFromCache = JsonSerializer.Deserialize<List<string>>(cacheData);
+                return Ok(categoriesFromCache);
+            }
+
+            // 2. Récupération des catégories (depuis votre base SQL Server)
+            var categories = new List<string> 
+            {
+                "Full",
+                "Aériens",
+                "Malte",
+                "Sucre",
+                "Groupage"
+            };
+
+            // 3. Mise en cache pour 30 minutes
+            var options = new DistributedCacheEntryOptions()
+                .SetAbsoluteExpiration(TimeSpan.FromHours(2));
+
+            await _cache.SetStringAsync(cacheKey, JsonSerializer.Serialize(categories), options);
+
+            return Ok(categories);
         }
     }
 }

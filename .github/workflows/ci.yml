@@ -2,15 +2,16 @@ name: Pipeline CI - Validation du Projet GestPR
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "develop" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "develop" ]
 
 jobs:
   # -------------------------------------------------------------
   # JOB 1 : Backend .NET 8
   # -------------------------------------------------------------
   build-backend:
+    name: Backend .NET 8 (Build & Test)
     runs-on: ubuntu-latest
 
     steps:
@@ -24,30 +25,39 @@ jobs:
 
     - name: Restauration des packages NuGet
       run: dotnet restore
-      working-directory: ./GestPR  # Ajustez si le nom du dossier backend diffère
+      working-directory: ./GestPR
 
     - name: Compilation du Backend .NET
       run: dotnet build --no-restore --configuration Release
-      working-directory: ./GestPR  # Ajustez si le nom du dossier backend diffère
+      working-directory: ./GestPR 
+
+    - name: Execution des tests unitaires .NET
+      run: dotnet test --no-build --configuration Release --verbosity normal
 
   # -------------------------------------------------------------
   # JOB 2 : Frontend React
   # -------------------------------------------------------------
   build-frontend:
+    name: Frontend React (Build & Test)
     runs-on: ubuntu-latest
 
     steps:
     - name: Récupération du code (Checkout)
       uses: actions/checkout@v4
 
-    - name: Configuration de Node.js (v20)
+    - name: Configuration de Node.js 24
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: '24'
+        cache: 'npm'
 
     - name: Installation des dépendances NPM
-      run: npm install
+      run: npm ci
       working-directory: ./Frontend  # Ajustez si le nom du dossier frontend diffère
+
+    - name: Execution des tests unitaires React
+      run: npm test -- --watchAll=false
+      working-directory: ./Frontend # Ajustez le chemin selon la structure de votre projet
 
     - name: Build de l'application React
       run: npm run build

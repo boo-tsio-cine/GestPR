@@ -121,6 +121,8 @@ export function TraitementDemande(){
     const [demandes, setDemandes] = useState(null);
     const [commentaire, setCommentaire] = useState("");
 
+    const [categories, setCategories] = useState([]);
+
     // données globales du dossier
     const [dossierData, setDossierData] = useState(emptyDossierData());
 

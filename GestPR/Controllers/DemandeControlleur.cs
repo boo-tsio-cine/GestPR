@@ -104,5 +104,7 @@ namespace GestPR.Controllers
             var result = await _service.GetHistoriqueByDesignationAsync(designation);
             return Ok(result);
         }
+
+        
     }
 }
