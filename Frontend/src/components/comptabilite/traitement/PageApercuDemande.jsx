@@ -270,6 +270,11 @@ export default function PageApercuDemande({idDemande, userRole = "Demandeur", on
             formData.append("typeDossier", dossierData.typeDossier || "");
             formData.append("immo", dossierData.immo || "");
 
+            // Cours de change saisi manuellement : envoyé pour être mémorisé dans Redis
+            // (voir CoursChangeService côté backend) afin de pré-remplir le prochain traitement
+            formData.append("devise", dossierData.unitcours || "");
+            formData.append("cours", dossierData.cours || "");
+
             toast.info("Envoi de la demande et enregistrement des prix...");
 
             // 5. Expédition unique au service API révisé
@@ -359,7 +364,7 @@ export default function PageApercuDemande({idDemande, userRole = "Demandeur", on
 
                 <div className="pdf-header">
                     <div className="image">
-                        <img src="/image/STA_LOGO_RVB.png" alt="" srcset="" />
+                        <img src="/image/STA_LOGO_RVB.png" alt="" srcSet="" />
                     </div>
                 </div>
 
@@ -630,7 +635,7 @@ export default function PageApercuDemande({idDemande, userRole = "Demandeur", on
                             return (
                             <tr key={art.id || index}>
                                 <td>{art.codeLot}</td>
-                                <td>{art.designation} {isCanettes && {libelleType}}</td>
+                                <td>{art.designation} {isCanettes && libelleType}</td>
                                 
                                 <td>{art.immo}</td>
                                 {/* <td className="text-end">{fmt(art.prixUnitaire || 0)} </td> */}

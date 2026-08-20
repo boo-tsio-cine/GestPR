@@ -7,10 +7,11 @@ import Input from "../ui/input";
 import { toast } from "sonner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { Button } from "../ui/button";
-import { Eye} from "lucide-react";
+import { Eye, History} from "lucide-react";
 import Nav from "../nav/nav";
 import "./comptabilite.css";
 import { Link } from "react-router-dom";
+import AuditDialog from "../AuditDialog";
 
 
 function Comptabilite(){
@@ -27,69 +28,69 @@ function Comptabilite(){
     const [detail, setDetail] = useState(null);
 
 
-    const fetchDemandes = async() => {
-        try{
-            setLoading(true);
-            setError(null);
+    const fetchDemandes = async () => {
+    try {
+        setLoading(true);
+        setError(null);
 
-            const [demandesRes, utilisateursRes] = await Promise.all([
-                demandeService.get(),
-                userService.getAll(),
-            ]);
+        const [demandesRes, utilisateursRes] = await Promise.all([
+            demandeService.get(),
+            userService.getAll(),
+        ]);
 
-            const listeDemandes = demandesRes.data || [];
-            const listeUtilisateurs = utilisateursRes.data || [];
-            
-            const demandesFormatees = listeDemandes.map((d) => {
-                const idDuDemandeur = d.demandeurId ?? d.DemandeurId;
+        const listeDemandes = demandesRes.data || [];
+        const listeUtilisateurs = utilisateursRes.data || [];
+        
+        const demandesFormatees = listeDemandes.map((d) => {
+            const idDuDemandeur = d.demandeurId ?? d.DemandeurId;
 
-                // On cherche l'utilisateur qui a le même ID dans la liste des utilisateurs
-                const utilisateurTrouve = listeUtilisateurs.find(
-                    (u) => (u.id ?? u.Id) === idDuDemandeur
-                );
+            const utilisateurTrouve = listeUtilisateurs.find(
+                (u) => (u.id ?? u.Id) === idDuDemandeur
+            );
 
-                return {
-                    id: d.id ?? d.Id, 
-                    motif: d.motif ?? d.Motif ?? "",
-                    status: d.status ?? d.Status ?? "Nouvelle",
-                    date: d.dateTime ?? d.DateTime,
-                    demandeurId: idDuDemandeur,
-                    pdfFileName: d.pdfFileName ?? d.PdfFileName ?? d.pdf ?? d.Pdf ?? "",
+            // Gestion souple des articles / lots
+            const articlesBruts = d.articles ?? d.Articles ?? [];
 
-                    site: utilisateurTrouve ? (utilisateurTrouve.site || utilisateurTrouve.Site || "") : "",
+            return {
+                id: d.id ?? d.Id, 
+                motif: d.motif ?? d.Motif ?? "",
+                status: d.status ?? d.Status ?? "Nouvelle",
+                date: d.dateTime ?? d.DateTime ?? d.date ?? d.Date,
+                demandeurId: idDuDemandeur,
+                pdfFileName: d.pdfFileName ?? d.PdfFileName ?? d.pdf ?? d.Pdf ?? "",
 
-                    // 👤 Si trouvé, on affiche son Nom (ajuste .nom ou .displayName selon ton API)
-                    nomDemandeur : utilisateurTrouve
-                        ? (utilisateurTrouve.nom || utilisateurTrouve.Nom || utilisateurTrouve.username)
-                        : `Utilisateur N°${idDuDemandeur}`,
-                    
-                    prenomDemandeur : utilisateurTrouve
-                        ? (utilisateurTrouve.prenom || utilisateurTrouve.Prenom || utilisateurTrouve.lastname)
-                        : `Utilisateur N°${idDuDemandeur}`,
-                    
-                    matricule : utilisateurTrouve
-                        ? (utilisateurTrouve.matricule || utilisateurTrouve.Matricule || utilisateurTrouve.matricule)
-                        : `Utilisateur N°${idDuDemandeur}`,
-                    
-                    site : utilisateurTrouve
-                        ? (utilisateurTrouve.site || utilisateurTrouve.Site || utilisateurTrouve.site)
-                        : `Utilisateur N°${idDuDemandeur}`, 
+                site: utilisateurTrouve 
+                    ? (utilisateurTrouve.site || utilisateurTrouve.Site || "") 
+                    : "",
 
-                    lots: (d.articles ?? d.Articles ?? []).map((a) =>({
-                        id: a.id ?? a.Id ?? 0,
-                        codeLot: a.codeLot ?? a.CodeLot ?? "",
-                        designation: a.designation ?? a.Designation ?? ""
-                    }))
-                };
-            });
+                nomDemandeur: utilisateurTrouve
+                    ? (utilisateurTrouve.nom || utilisateurTrouve.Nom || utilisateurTrouve.username || utilisateurTrouve.Username)
+                    : `Utilisateur N°${idDuDemandeur}`,
+                
+                prenomDemandeur: utilisateurTrouve
+                    ? (utilisateurTrouve.prenom || utilisateurTrouve.Prenom || utilisateurTrouve.lastname)
+                    : "",
+                
+                matricule: utilisateurTrouve
+                    ? (utilisateurTrouve.matricule || utilisateurTrouve.Matricule)
+                    : `N°${idDuDemandeur}`,
 
-            setDemande(demandesFormatees);
-        }catch(err){
-            setError(err.message || "Erreur de chargement")
-        }finally{
-            setLoading(false);
-        }
+                lots: articlesBruts.map((a) => ({
+                    id: a.id ?? a.Id ?? 0,
+                    codeLot: a.codeLot ?? a.CodeLot ?? "",
+                    designation: a.designation ?? a.Designation ?? ""
+                }))
+            };
+        });
+
+        setDemande(demandesFormatees);
+    } catch(err) {
+        console.error("Erreur chargement demandes:", err);
+        setError(err.message || "Erreur de chargement");
+    } finally {
+        setLoading(false);
     }
+};
 
     useEffect(()=>{
         fetchDemandes();
@@ -139,6 +140,8 @@ function Comptabilite(){
         }
     };
 
+    const [auditDemandeId, setAuditDemandeId] = useState(null); 
+
     return<>
         <Nav className="navbar"/>
         <div className="compta">
@@ -166,6 +169,7 @@ function Comptabilite(){
                                 <select id="statusFilter" className="form-select" value={filtrerStatus} onChange={(e) => setFiltrerStatus(e.target.value)}>
                                     <option value="">Tous</option>
                                     <option value="Nouvelle">Nouvelle</option>
+                                    <option value="En cours">En cours</option>
                                     <option value="En attente">En attente</option>
                                     <option value="Validée">Validée</option>
                                     <option value="Refusée">Refusée</option>
@@ -198,13 +202,23 @@ function Comptabilite(){
                 </nav>
             </CardHeader>
             <CardContent>
-                <DemandesTable data={demandesFiltrees} onDetail={handleDetail} empty="Aucune demande enregistrée." />
+                <DemandesTable 
+                    data={demandesFiltrees} 
+                    onDetail={handleDetail} 
+                    empty="Aucune demande enregistrée." 
+                    onVoirAudit={(id) => setAuditDemandeId(id)}
+                />
+                <AuditDialog
+                    demandeId={auditDemandeId}
+                    open={!!auditDemandeId}
+                    onClose={() => setAuditDemandeId(null)}
+                />
             </CardContent>
         </Card>
     </>
 }
 
-function DemandesTable({ data, empty, onDetail }) {
+function DemandesTable({ data, empty, onDetail, onVoirAudit }) {
     const [selectedDemande, setSelectedDemande] = useState(null);
     const [currentPdfUrl, setCurrentPdfUrl] = useState("");
     const [pdfFileName, setPdfFileName] = useState("");
@@ -333,6 +347,12 @@ function DemandesTable({ data, empty, onDetail }) {
                                 </div>
                             </div>
                             <div className="card-link">
+                                <button 
+                                    className="btn btn-secondary text-white flex items-center gap-1"
+                                    onClick={() => onVoirAudit(d.id)}
+                                >
+                                    <History className="h-4 w-4" /> Historique
+                                </button>
                                 {d.status === "Nouvelle" ? (
                                     <Link className="btn btn-success text-white" to={`/traiter-demande/${d.id}`} style={{ display:'inline-block', textDecoration:'none'}}>
                                         Traiter la demande

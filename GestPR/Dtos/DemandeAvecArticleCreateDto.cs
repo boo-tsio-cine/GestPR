@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.AspNetCore.Http;
+using System;
 using System.Collections.Generic;
 
 namespace GestPR.Dtos
@@ -50,6 +51,10 @@ namespace GestPR.Dtos
 
         public string? TypeDossier { get; set; }
         public string? Immo { get; set; }
+
+        // Cours de change saisi manuellement par l'utilisateur pour ce traitement
+        public string? Devise { get; set; }
+        public decimal? Cours { get; set; }
     }
 
     public class UpdateStatusDto
@@ -63,5 +68,16 @@ namespace GestPR.Dtos
         public int ArticleId { get; set; }
         public decimal PrixDeRevient { get; set; }
         public string? Immo { get; set; }
+    }
+
+    // Nécessaire pour la sérialisation Redis : JsonSerializer.Deserialize
+    // ne fonctionne pas avec des types anonymes (new { ... })
+    public class HistoriqueArticleDto
+    {
+        public int DemandeId { get; set; }
+        public DateTime Date { get; set; }
+        public string Status { get; set; } = "";
+        public string CodeLot { get; set; } = "";
+        public decimal PrixDeRevient { get; set; }
     }
 }

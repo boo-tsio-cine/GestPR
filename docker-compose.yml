@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+  # ----------------------------------------
+  # 1. Base de données SQL Server
+  # ----------------------------------------
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: gestpr-sqlserver
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=Star2026!
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+
+  # ----------------------------------------
+  # 2. Base de données MongoDB (Journal d'audit)
+  # ----------------------------------------
+  mongodb:
+    image: mongo:latest
+    container_name: gestpr-mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+
+  # ----------------------------------------
+  # 3. Cache Redis
+  # ----------------------------------------
+  redis:
+    image: redis:alpine
+    container_name: gestpr-redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+ # ----------------------------------------
+  # 4. Backend .NET 8 API
+  # ----------------------------------------
+  backend:
+    image: gestpr_backend
+    build:
+      context: ./GestPR
+      dockerfile: Dockerfile
+    container_name: gestpr-api
+    dns: 
+      - 8.8.8.8
+      - 8.8.4.4
+    ports:
+      - "5000:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Development"
+      ConnectionStrings__DefaultConnection: "Server=host.docker.internal;Database=prix_revien_db;User Id=sa;Password=Star0000;TrustServerCertificate=True;Encrypt=False;"
+      MongoDbSetting__ConnectionString: "mongodb://mongodb:27017"
+      MongoDbSetting__DatabaseName: "GestPR_Audit"
+      ConnectionStrings__Redis: "redis:6379"
+      DOTNET_SYSTEM_NET_HTTP_SOCKETSHTTPHANDLER_HTTP2UNENCRYPTEDSUPPORT: "true"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      - sqlserver
+      - mongodb
+      - redis
+
+      
+  # ----------------------------------------
+  # 5. Frontend React
+  # ----------------------------------------
+  frontend:
+    build:
+      context: ./Frontend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80"
+
+volumes:
+  sqlserver_data:
+  mongodb_data:

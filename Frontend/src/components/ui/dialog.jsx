@@ -23,16 +23,28 @@ const DialogClose = DialogPrimitive.Close;
 
 // Overlay : fond sombre semi-transparent derrière la modale.
 // Animé avec data-[state=open/closed] pour des transitions fluides (fade in/out).
+// const DialogOverlay = React.forwardRef(({ className, ...props }, ref) => (
+//   <DialogPrimitive.Overlay
+//     ref={ref}
+//     className={cn(
+//       "fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=open]:backdrop-blur-sm",
+//       className,
+//     )}
+//     {...props}
+//   />
+// ));
+
 const DialogOverlay = React.forwardRef(({ className, ...props }, ref) => (
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=open]:backdrop-blur-sm",
-      className,
+      "fixed inset-0 z-[9998] bg-black/60 backdrop-blur-sm",
+      className
     )}
     {...props}
   />
 ));
+
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
 // Contenu principal de la modale : fenêtre centrée avec animation de zoom.
@@ -43,8 +55,12 @@ const DialogContent = React.forwardRef(({ className, children, overlayClassName,
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-lg",
-        className,
+        // 🟢 Remplacez "bg-background" par "bg-white" et ajoutez "opacity-100 visible"
+        // "fixed left-[50%] top-[50%] z-[99999] grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-white p-6 shadow-xl duration-200 opacity-100 visible sm:rounded-lg",
+        // className
+
+        "fixed left-1/2 top-1/2 z-[9999] w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 border border-gray-200 bg-white p-6 shadow-2xl rounded-lg text-gray-900",
+        className
       )}
       {...props}
     >

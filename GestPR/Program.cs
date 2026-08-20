@@ -1,20 +1,26 @@
 ﻿using GestPR.Data;
+using GestPR.Dtos;
+using GestPR.Middleware;
+using GestPR.Models;
 using GestPR.Repository;
 using GestPR.Repository.Demandes;
 using GestPR.Repository.Taux_Historic;
 using GestPR.Service;
+using GestPR.Service.Audit;
 using GestPR.Service.Demandes;
 using GestPR.Service.Email;
 using GestPR.Service.Taux_Historic;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Authentication.Negotiate;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Server.IISIntegration;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
-using System.Net.Security;
-using System.Text;
+using Microsoft.Extensions.Options;
+using MongoDB.Bson.Serialization;
+using MongoDB.Bson.Serialization.Serializers;
+using MongoDB.Driver;
 
 namespace GestPR
 {
@@ -28,17 +34,28 @@ namespace GestPR
             // 1. ENREGISTREMENT DES SERVICES (BUILDER)
             // =========================================================
 
-            // 🔴 SUPPRIMÉ : builder.Services.AddStarLdapAuthentication (LDAP retiré)
-
-            // Chaîne de connexion à la base de données
             var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
                 ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+
+            // Configuration uniforme du schéma d'authentification par défaut
+            //builder.Services.AddAuthentication(options =>
+            //{
+            //    options.DefaultAuthenticateScheme = IISDefaults.AuthenticationScheme;
+            //    options.DefaultChallengeScheme = IISDefaults.AuthenticationScheme;
+            //});
+            // Remplacez la configuration IISDefaults par ceci :
+            builder.Services.AddAuthentication(NegotiateDefaults.AuthenticationScheme)
+                .AddNegotiate();
 
             builder.Services.AddDbContext<ApplicationDbContext>(options =>
                 options.UseSqlServer(connectionString));
 
             builder.Services.AddDbContext<AppDbContext>(options =>
                 options.UseSqlServer(connectionString));
+
+            //builder.Services.AddDbContext<AppDbContext>(options =>
+            //    options.UseSqlServer(connectionString, sqlOptions =>
+            //        sqlOptions.TranslateParameterizedCollectionsToConstants()));
 
             builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
@@ -53,7 +70,7 @@ namespace GestPR
                     options.SuppressModelStateInvalidFilter = true;
                 });
 
-            // Configuration CORS (indispensable pour lier le frontend React sur le port 5173)
+            // Configuration CORS pour le frontend React
             builder.Services.AddCors(options =>
             {
                 options.AddPolicy("AllowReactApp", policy =>
@@ -61,7 +78,7 @@ namespace GestPR
                     policy.WithOrigins("http://localhost:5173")
                           .AllowAnyMethod()
                           .AllowAnyHeader()
-                          .AllowCredentials(); // Permet le transfert de l'identité de session Windows !
+                          .AllowCredentials();
                 });
             });
 
@@ -77,7 +94,6 @@ namespace GestPR
                         .Where(e => e.Value?.Errors.Count > 0)
                         .Select(e => new {
                             Field = e.Key,
-                            // 🟢 CORRIGÉ : "[]" remplace "Array.Empty<string>()"
                             Errors = e.Value?.Errors.Select(x => x.ErrorMessage) ?? []
                         });
                     Console.WriteLine("=== VALIDATION ERRORS ===");
@@ -89,32 +105,12 @@ namespace GestPR
                 };
             });
 
-            // Accesseur HttpContext nécessaire pour lire la session de l'utilisateur
             builder.Services.AddHttpContextAccessor();
 
-            // Configuration de l'authentification Windows de la session locale
-            builder.Services.AddAuthentication(options =>
-            {
-                options.DefaultScheme = IISDefaults.AuthenticationScheme;
-            });
-            // =========================================================
-            // CONFIGURATION DE L'AUTHENTIFICATION WINDOWS NATIVE (IIS)
-            // =========================================================
-            builder.Services.AddAuthentication(NegotiateDefaults.AuthenticationScheme)
-               .AddNegotiate();
-
-
-            builder.Services.AddAuthorization(options =>
-            {
-                options.FallbackPolicy = options.DefaultPolicy;
-            });
-
-
-
+            // Autorisations
             builder.Services.AddAuthorization();
 
-            // Enregistrement de tes services applicatifs
-
+            // Services applicatifs
             builder.Services.AddScoped<IOrigineRepository, OrigineRepository>();
             builder.Services.AddScoped<IOrigineService, OrigineService>();
 
@@ -124,18 +120,92 @@ namespace GestPR
             builder.Services.AddScoped<ITauxRepository, TauxRepository>();
             builder.Services.AddScoped<ITauxService, TauxService>();
 
-            // Dans Program.cs
-            builder.Services.AddTransient<IEmailService, EmailService>();
-            builder.Services.AddHttpContextAccessor();
+            builder.Services.AddScoped<GrilleFraisService>();
 
+            builder.Services.AddTransient<IEmailService, EmailService>();
             builder.Services.AddDistributedMemoryCache();
+
+            // Configuration MongoDB
+            builder.Services.Configure<MongoDbSetting>(builder.Configuration.GetSection("MongoDbSetting"));
+
+            builder.Services.AddSingleton<IMongoClient>(sp =>
+            {
+                var settings = sp.GetRequiredService<IOptions<MongoDbSetting>>().Value;
+                return new MongoClient(settings.ConnectionString);
+            });
+
+            builder.Services.AddScoped(sp =>
+            {
+                var settings = sp.GetRequiredService<IOptions<MongoDbSetting>>().Value;
+                var client = sp.GetRequiredService<IMongoClient>();
+                return client.GetDatabase(settings.DatabaseName);
+            });
+
+            builder.Services.AddScoped<IAuditService, AuditService>();
+
+            var objectSerializer = new ObjectSerializer(ObjectSerializer.AllAllowedTypes);
+            BsonSerializer.RegisterSerializer(objectSerializer);
+
+            // Validation du ModelState
+            builder.Services.Configure<ApiBehaviorOptions>(options =>
+            {
+                options.InvalidModelStateResponseFactory = context =>
+                {
+                    var errors = context.ModelState
+                        .Where(e => e.Value?.Errors.Count > 0)
+                        .SelectMany(e => e.Value!.Errors.Select(x => $"{e.Key}: {x.ErrorMessage}"))
+                        .ToList();
+
+                    var response = ApiResponse<object>.Fail("Erreur de validation des données.", errors);
+                    return new BadRequestObjectResult(response);
+                };
+            });
+
+            // Redis
+            builder.Services.AddStackExchangeRedisCache(options =>
+            {
+                options.Configuration = builder.Configuration.GetConnectionString("Redis");
+                options.InstanceName = "GestPR_";
+            });
+
+            builder.Services.AddScoped<DeviseService>();
+            builder.Services.AddScoped<CoursChangeService>();
+
+            // Health Checks
+            builder.Services.AddHealthChecks()
+                .AddSqlServer(
+                    connectionString: builder.Configuration.GetConnectionString("DefaultConnection")!,
+                    name: "SQL Server",
+                    tags: new[] { "db", "sql" })
+                .AddRedis(
+                    redisConnectionString: builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379",
+                    name: "Redis Cache",
+                    tags: new[] { "cache", "redis" })
+                .AddMongoDb(
+                    sp => sp.GetRequiredService<IMongoClient>(),
+                    name: "MongoDB Audit",
+                    tags: new[] { "db", "nosql" });
 
             // =========================================================
             // 2. MIDDLEWARES PIPELINE
             // =========================================================
             var app = builder.Build();
 
-            // Middleware CORS personnalisé pour autoriser les cookies de session et Windows Auth (Credentials)
+            app.UseMiddleware<ExceptionMiddleware>();
+
+            if (app.Environment.IsDevelopment())
+            {
+                app.UseSwagger();
+                app.UseSwaggerUI();
+                app.UseMigrationsEndPoint();
+            }
+            else
+            {
+                app.UseExceptionHandler("/Error");
+                app.UseHsts();
+            }
+
+            // Middleware CORS personnalisé
             app.Use(async (context, next) =>
             {
                 context.Response.Headers.Append("Access-Control-Allow-Origin", "http://localhost:5173");
@@ -153,24 +223,10 @@ namespace GestPR
                 await next();
             });
 
-            if (app.Environment.IsDevelopment())
-            {
-                app.UseMigrationsEndPoint();
-                app.UseSwagger();
-                app.UseSwaggerUI();
-            }
-            else
-            {
-                app.UseExceptionHandler("/Error");
-                app.UseHsts();
-            }
-
-            // Active le serveur de fichiers statiques pour le dossier wwwroot
             app.UseStaticFiles(new StaticFileOptions
             {
                 OnPrepareResponse = ctx =>
                 {
-                    // Si le fichier demandé est un PDF, on force l'affichage "inline"
                     if (ctx.File.Name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
                     {
                         ctx.Context.Response.Headers["Content-Disposition"] = "inline";
@@ -178,11 +234,6 @@ namespace GestPR
                     }
                 }
             });
-            app.UseCors(policy => policy
-                .AllowAnyHeader()
-                .AllowAnyMethod()
-                .SetIsOriginAllowed(origin => true) // Autorise toutes les adresses locales/réseau
-                .AllowCredentials());
 
             app.UseRouting();
 
@@ -191,6 +242,11 @@ namespace GestPR
 
             app.MapControllers();
             app.MapFallbackToFile("index.html");
+
+            app.MapHealthChecks("/health", new HealthCheckOptions
+            {
+                ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
+            }).AllowAnonymous();
 
             app.Run();
         }

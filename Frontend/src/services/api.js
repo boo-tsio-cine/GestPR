@@ -1,4 +1,5 @@
 import axios from "axios";
+import { toast } from "sonner";
 
 // --- CONFIGURATION DES ADRESSES API ---
 const IS_PRODUCTION = window.location.hostname !== "localhost";
@@ -9,7 +10,7 @@ const PROD_PORT = "";
 
 const API_URL = IS_PRODUCTION 
   ? `http://${window.location.hostname}${PROD_PORT}/api` // URL dynamique de production
-  : "http://localhost:5233/api";                        // URL locale de test
+  : "http://localhost:5005/api";                        // URL locale de test
 
 const api = axios.create({
   baseURL: API_URL,
@@ -42,11 +43,48 @@ api.interceptors.request.use((config) => {
 
 // ✅ Intercepteur — si 401 → rediriger vers login
 api.interceptors.response.use(
-  (response) => response, 
-  (error) =>  {
-    if(error.response?.status === 401){
-      localStorage.removeItem("gestpr_user");
-      window.location.href = "/login";
+  (response) => {
+    // Si le backend utilise le format ApiResponse<T>
+    if(response.data && typeof response.data === 'object' && 'success' in response.data) {
+      if (!response.data.success) {
+        toast.error(response.data.message || "Une erreur est survenue.");
+        return Promise.reject(response.data);
+      }
+    }
+    return response;
+  },
+  (error) => {
+    if (error.response) {
+      const { status, data } = error.response;
+
+      if (status === 401) {
+        localStorage.removeItem("gestpr_user");
+        toast.error("Session expirée ou non autorisée.");
+        window.location.href = "/login";
+        return Promise.reject(error);
+      }
+
+      // Extraction du message d'erreur du backend (ApiResponse ou ExceptionMiddleware)
+      const serverMessage = data?.message || data?.Message || null;
+
+      if (status === 400 && data?.errors && Array.isArray(data.errors)) {
+        // Erreurs de validation ModelState
+        data.errors.forEach((err) => toast.error(err));
+      } else if (serverMessage) {
+        toast.error(serverMessage);
+      } else if (status === 403) {
+        toast.error("Accès refusé : Vous n'avez pas les permissions requises.");
+      } else if (status === 404) {
+        toast.error("La ressource demandée est introuvable.");
+      } else if (status === 500) {
+        toast.error("Une erreur interne du serveur est survenue.");
+      } else {
+        toast.error(`Erreur HTTP (${status})`);
+      }
+    } else if (error.request) {
+      toast.error("Impossible de contacter le serveur backend. Vérifiez le réseau.");
+    } else {
+      toast.error(error.message || "Une erreur inattendue est survenue.");
     }
 
     return Promise.reject(error);
@@ -93,6 +131,11 @@ export const tauxHistoriqueService = {
   getAll: () => api.get("/tauxHistorique/"),
 };
 
+// Lecture du dernier cours de change saisi, mis en cache Redis (voir CoursChangeService.cs)
+export const coursChangeService = {
+  getDernierCours: (devise) => api.get(`/coursChange/${encodeURIComponent(devise)}`),
+};
+
 export const authService = {
   connexionAutomatiqueWindows: () => api.get("/Auth/windows-login"),
 };
@@ -111,6 +154,8 @@ export const demandeService = {
 
   getHistoriqueByDesignation: (designation) => api.get(`/demandes/historique/${encodeURIComponent(designation)}`),
   updateStatus: (id, status, motif) => api.put(`/demandes/${id}/status`, { status, motif }),
+
+  getAuditLogs: (id)=> api.get(`/demandes/${id}/audit`),
 };
 
 export const articleService = {

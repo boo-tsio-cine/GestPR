@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { toast, Toaster } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "../ui/dialog";
-import { Eye, FileText, Plus, Send, Trash2 } from "lucide-react";
+import { Eye, FileText, HistoryIcon, Plus, Send, Trash2 } from "lucide-react";
 import Label from "../ui/label";
 import Input from "../ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/Cards";
@@ -13,6 +13,7 @@ import Nav from "../nav/nav";
 import { articleService, demandeService, userService } from "../../services/api";
 import api from "../../services/api";
 import axios from "axios"; // Ensure axios is imported
+import AuditDialog from "../AuditDialog";
 
 function todayISO() {
     return new Date().toISOString().slice(0, 10);
@@ -36,6 +37,9 @@ function Demandeur() {
     const [demandes, setDemandes] = useState([]);
     const [open, setOpen] = useState(false);
     const [detail, setDetail] = useState(null);
+    const [audit, setAudit] = useState(null);
+
+
     const { user, loading } = useAuth();
     const [userId, setUserId] = useState(null);
     const [loadingDetail, setLoadingDetail] = useState(false);
@@ -113,7 +117,7 @@ function Demandeur() {
 
         const baseUrl = api.defaults.baseURL 
             ? new URL(api.defaults.baseURL).origin 
-            : "http://localhost:5233";
+            : "http://localhost:5000";
             
         const pdfUrl = `${baseUrl}/uploads/pdfs/${d.pdfFileName}`;
 
@@ -256,22 +260,24 @@ function Demandeur() {
         return result;
     }, [demandes, filtrerDate, filtrerStatus, filtrerLots, filtrerCodeLot, triDate]);
 
+    const [auditDemandeId, setAuditDemandeId] = useState(null); // 👈 État pour la modal audit
 
-
-    return (
+    return (    
         <main>
             <Nav/>
+            {/* On applique le flou uniquement sur le fond de page quand un dialog classique est ouvert */}
             <div className={`page ${open ? "blur" : ""} ${detail ? "blur" : ""}`}>
                 <div className="background"></div>
                 <Toaster />
                 
+                {/* 1. Dialogue Nouvelle Demande */}
                 <Dialog open={open} onOpenChange={setOpen}>
                     <DialogTrigger asChild>
                         <Button size="lg" className="gap-2 button">
                             <FileText className="h-4 w-4" /> Nouvelle demande
                         </Button>
                     </DialogTrigger>
-                   
+                
                     <DialogContent className="dialog_demande_content" overlayClassName="fixed inset-0 bg-black/30 backdrop-blur-sm">
                         <DialogHeader>
                             <DialogTitle>Nouvelle demande</DialogTitle>
@@ -333,12 +339,12 @@ function Demandeur() {
                     </DialogContent>
                 </Dialog>
                 
+                {/* Tableau principal et Filtres */}
                 <div className="mx-auto max-w-6xl space-y-8 divblock">
                     <header className="flex flex-wrap items-center justify-between gap-4">
                         <div>
                             <h1 className="text-3xl font-bold tracking-tight">Mes demandes</h1>
                         </div>
-                        
                     </header>
 
                     <Card className="card">
@@ -378,7 +384,7 @@ function Demandeur() {
                                         </div>
                                         <div className="col-md-2" style={{ position: "relative", marginTop: "3rem" }}>
                                             <button
-                                                className="btn  w-100 btn-reinit text-white"
+                                                className="btn w-100 btn-reinit text-white"
                                                 onClick={() => {
                                                     setFiltrerDate("");
                                                     setFiltrerStatus("");
@@ -395,11 +401,18 @@ function Demandeur() {
                             </nav>
                         </CardHeader>
                         <CardContent>
-                            <DemandesTable data={demandesFiltrees} onDetail={handleDetail} onVoirPdf={ouvrirPdf} empty="Aucune demande enregistrée." />
+                            <DemandesTable 
+                                data={demandesFiltrees} 
+                                onDetail={handleDetail} 
+                                onVoirPdf={ouvrirPdf} 
+                                onVoirAudit={(id) => setAuditDemandeId(id)}
+                                empty="Aucune demande enregistrée." 
+                            />
                         </CardContent>
                     </Card>
                 </div>
 
+                {/* 2. Dialogue Détail */}
                 <Dialog open={!!detail} onOpenChange={(v) => !v && setDetail(null)}>
                     <DialogContent className="dialog_demande_content" overlayClassName="fixed inset-0 bg-black/30 backdrop-blur-sm">
                         <DialogHeader>
@@ -411,7 +424,7 @@ function Demandeur() {
                             </DialogDescription>
                         </DialogHeader>
                         {detail && (
-                            <Table className = "dialog-detail">
+                            <Table className="dialog-detail">
                                 <TableHeader>
                                     <TableRow className="table-dialog">
                                         <TableHead className="table-dialog-head">IdArticle</TableHead>
@@ -422,7 +435,6 @@ function Demandeur() {
                                 </TableHeader>
                                 <TableBody>
                                     {(detail.lots ?? []).map((a, i) => (
-                                        //{String(id).padStart(3, '0')}
                                         <TableRow key={a.id || i}>
                                             <TableCell>{String(a.id).padStart(3, '0')}</TableCell>
                                             <TableCell className="font-mono">{a.codeLot || "—"}</TableCell>
@@ -436,19 +448,12 @@ function Demandeur() {
                     </DialogContent>
                 </Dialog>
                 
+                {/* 3. Dialogue Aperçu PDF */}
                 <Dialog open={openPdf} onOpenChange={setOpenPdf}>
                     <DialogContent className="dialog_demande_content" overlayClassName="fixed inset-0 bg-black/30 backdrop-blur-sm" style={{ maxWidth: '96vw', width: '96vw', maxHeight: '96vh', height: '96vh', display: 'flex', flexDirection: 'column', padding: 0 }}>
                         <DialogHeader style={{ padding: '16px 20px 0' }}>
                             <DialogTitle>
                                 <span>Prévisualisation du PDF</span>   
-                                {/* <a 
-                                    href={selectedPdf} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer" 
-                                    className="text-xs text-blue-600 hover:underline mr-8"
-                                >
-                                    Ouvrir dans un nouvel onglet
-                                </a> */}
                             </DialogTitle>
                         </DialogHeader>
                         <div style={{ flex: 1, minHeight: 0, padding: '12px 20px 20px' }}>
@@ -462,12 +467,23 @@ function Demandeur() {
                         </div>
                     </DialogContent>
                 </Dialog>
+
+
             </div>
+                {/* 4. Dialogue Audit / Suivi (Placé correctement dans le flux principal) */}
+                <AuditDialog
+                    // demandeId={auditDemandeId}
+                    // open={auditDemandeId !== null && auditDemandeId !== undefined}
+                    // onClose={() => setAuditDemandeId(null)}
+                    demandeId={auditDemandeId}
+                    open={Boolean(auditDemandeId)}
+                    onClose={() => setAuditDemandeId(null)}
+                />
         </main>
     );
 }
 
-function DemandesTable({ data, onDetail, onVoirPdf, empty }) {
+function DemandesTable({ data, onDetail, onVoirPdf, empty, onVoirAudit }) {
     if (data.length === 0) {
         return <p className="py-6 text-center text-sm text-muted-foreground">{empty}</p>;
     }
@@ -497,13 +513,24 @@ function DemandesTable({ data, onDetail, onVoirPdf, empty }) {
                             </TableCell>
                             <TableCell className="px-4 py-3 status" style={{
                                 color: d.status === "Nouvelle" ? "#000927" : d.status === "En attente" ? "#854D0E" : d.status === "Validée" ? "#166534" : "#9F1239",
-                                backgroundColor: d.status === "Nouvelle" ? "#a9caf5" : d.status === "En attente" ? "#FEF9C3" : d.status === "Validée" ? "#DCFCE7" : "#FFE4E6",
+                                backgroundColor: d.status === "Nouvelle" ? "#a9caf5" : d.status === "En attente" ? "#FEF9C3" : d.status === "En cours" ? "#FEF9C3" : d.status === "Validée" ? "#DCFCE7" : "#FFE4E6",
                                 
                             }}>
                                 {d.status}
                             </TableCell>
                             <TableCell className="px-4 py-3 text-right">
                                 <div className="flex justify-end gap-2">
+                                    <Button size="sm" 
+                                        variant="outline" 
+                                        className="gap-1" 
+                                        onClick={(e) => {
+                                            e.stopPropagation(); // Empêche la propagation de l'événemente
+                                            e.preventDefault(); // Empêche le comportement par défaut du bouton
+                                            onVoirAudit(d.id);
+                                        }}
+                                    >
+                                        <HistoryIcon className="h-4 w-4 text-blue-600" /> Suivi
+                                    </Button>
                                     <Button size="sm" variant="outline" className="gap-1 btn_detail" onClick={() => onDetail(d)}>
                                         <span></span>
                                         <span></span>

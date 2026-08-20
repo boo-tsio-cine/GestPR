@@ -18,6 +18,12 @@ namespace GestPR.Data
         public DbSet<TauxHistorique> TauxHistorique { get; set; }
         public DbSet<Demande> Demande { get; set; }
         public DbSet<Article> Article { get; set; }
+        public DbSet<ParametreFrais> ParametresFrais { get; set; }
+        public DbSet<Devise> Devises {get; set; }
+
+        public DbSet<Nomenclature> Nomenclature { get; set; }
+        public DbSet<LigneNomenclature> LignesNomenclature { get; set; }
+        //public DbSet<ParametreFrais> ParametresFrais { get; set; }
 
         // ✅ Forcer explicitement la clé primaire
         protected override void OnModelCreating(ModelBuilder modelBuilder)

@@ -143,6 +143,30 @@ namespace GestPR.Migrations
                     b.ToTable("Demande");
                 });
 
+            modelBuilder.Entity("GestPR.Models.Devise", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Libelle")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("TauxParDefaut")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Devises");
+                });
+
             modelBuilder.Entity("GestPR.Models.Fournisseur", b =>
                 {
                     b.Property<int>("Id")
@@ -161,6 +185,63 @@ namespace GestPR.Migrations
                     b.ToTable("Fournisseur");
                 });
 
+            modelBuilder.Entity("GestPR.Models.LigneNomenclature", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ComposantId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("NomenclatureId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("PrixUnitaire")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("Quantite")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ComposantId");
+
+                    b.HasIndex("NomenclatureId");
+
+                    b.ToTable("LigneNomenclature");
+                });
+
+            modelBuilder.Entity("GestPR.Models.Nomenclature", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ArticleId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CodeArticle")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("DateCreation")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Nomenclatures");
+                });
+
             modelBuilder.Entity("GestPR.Models.Origine", b =>
                 {
                     b.Property<int>("Id")
@@ -177,6 +258,40 @@ namespace GestPR.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Origine");
+                });
+
+            modelBuilder.Entity("GestPR.Models.ParametreFrais", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("CodeFrais")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<bool>("EstPourcentage")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Libelle")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("TypeMatiere")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<decimal>("ValeurParDefaut")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ParametresFrais");
                 });
 
             modelBuilder.Entity("GestPR.Models.Taux", b =>
@@ -300,6 +415,25 @@ namespace GestPR.Migrations
                     b.Navigation("Demandeur");
                 });
 
+            modelBuilder.Entity("GestPR.Models.LigneNomenclature", b =>
+                {
+                    b.HasOne("GestPR.Models.Article", "Composant")
+                        .WithMany()
+                        .HasForeignKey("ComposantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("GestPR.Models.Nomenclature", "Nomenclature")
+                        .WithMany("Lignes")
+                        .HasForeignKey("NomenclatureId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Composant");
+
+                    b.Navigation("Nomenclature");
+                });
+
             modelBuilder.Entity("GestPR.Models.TauxHistorique", b =>
                 {
                     b.HasOne("GestPR.Models.Taux", "Taux")
@@ -314,6 +448,11 @@ namespace GestPR.Migrations
             modelBuilder.Entity("GestPR.Models.Demande", b =>
                 {
                     b.Navigation("Articles");
+                });
+
+            modelBuilder.Entity("GestPR.Models.Nomenclature", b =>
+                {
+                    b.Navigation("Lignes");
                 });
 
             modelBuilder.Entity("GestPR.Models.Taux", b =>

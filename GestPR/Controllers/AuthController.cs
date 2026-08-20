@@ -1,6 +1,8 @@
 using GestPR.Data;
 using GestPR.DTOs; // <--- INDISPENSABLE pour IConfiguration
 using GestPR.Models;
+using Microsoft.AspNetCore.Authentication.Negotiate;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
@@ -32,53 +34,65 @@ namespace GestPR.Controllers
         }
 
         [HttpGet("windows-login")]
-      
+        [Authorize(AuthenticationSchemes = NegotiateDefaults.AuthenticationScheme)]
         public async Task<IActionResult> GetLogin()
         {
             try
             {
                 string? rawUser = null;
 
-                // --- MANIÈRE 1 : Variables serveur IIS (La méthode reine en déploiement IIS d'entreprise) ---
-                var serverVariables = HttpContext.Features.Get<Microsoft.AspNetCore.Http.Features.IServerVariablesFeature>();
-                if (serverVariables != null)
+                // --- 1. Tentative d'obtention sécurisée des variables IIS (Si exécuté sous IIS) ---
+                try
                 {
-                    rawUser = serverVariables["LOGON_USER"] ?? serverVariables["AUTH_USER"];
+                    var serverVariables = HttpContext.Features.Get<Microsoft.AspNetCore.Http.Features.IServerVariablesFeature>();
+                    if (serverVariables != null)
+                    {
+                        rawUser = serverVariables["LOGON_USER"] ?? serverVariables["AUTH_USER"];
+                    }
+                }
+                catch
+                {
+                    // Ignore l'erreur si IServerVariablesFeature n'est pas supporté (ex: Kestrel Linux Docker)
                 }
 
-                // --- MANIÈRE 2 : Contexte utilisateur HTTP (S'appuie sur l'authentification Windows du protocole HTTP) ---
+                // --- 2. Identity Claims standard ---
                 if (string.IsNullOrEmpty(rawUser))
                 {
                     rawUser = HttpContext.User?.Identity?.Name
                               ?? HttpContext.User?.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
                 }
 
-                // --- SÉCURITÉ DEPLOIEMENT : Suppression absolue d'Environment.UserName ---
-                // Si on détecte un compte de service IIS à cause d'une mauvaise configuration système, on refuse
+                // --- 3. MODE MOCK / DÉVELOPPEMENT DOCKER ---
+                // En conteneur Docker Linux, la session Windows distante n'est pas transmise nativement.
+                // Vous pouvez utiliser le header 'X-Forwarded-User' ou basculer sur un utilisateur de test.
+                if (string.IsNullOrEmpty(rawUser) && Request.Headers.TryGetValue("X-Forwarded-User", out var mockUser))
+                {
+                    rawUser = mockUser.ToString();
+                }
+
+                // Nettoyage des comptes système IIS
                 if (!string.IsNullOrEmpty(rawUser) &&
                     (rawUser.Contains("IIS APPPOOL", StringComparison.OrdinalIgnoreCase) ||
                      rawUser.Contains("NETWORK SERVICE", StringComparison.OrdinalIgnoreCase) ||
                      rawUser.Contains("SYSTEM", StringComparison.OrdinalIgnoreCase)))
                 {
-                    rawUser = null; // On invalide pour forcer une erreur explicite d'authentification utilisateur
+                    rawUser = null;
                 }
 
-                // --- VÉRIFICATION GLOBALE ---
+                // Si aucun utilisateur n'est identifié (cas standard sur Docker sans IIS Proxy)
                 if (string.IsNullOrEmpty(rawUser))
                 {
                     return Unauthorized(new
                     {
                         Connected = false,
-                        Message = "Impossible d'identifier votre session Windows d'entreprise. Veuillez vérifier que l'authentification Windows est active sur votre navigateur et sur IIS."
+                        Message = "Session Windows d'entreprise non détectée."
                     });
                 }
 
-                // Nettoyage du domaine si présent (S_TANA_00\tsio700529 -> tsio700529)
-                string cleanedUserName = rawUser.Contains("\\")
-                    ? rawUser.Split('\\')[1]
-                    : rawUser;
+                // Nettoyage du domaine
+                string cleanedUserName = rawUser.Contains("\\") ? rawUser.Split('\\')[1] : rawUser;
 
-                // Recherche de l'utilisateur dans la base de données
+                // Recherche en BDD
                 var dbUser = await _context.ApplicationUsers
                     .FirstOrDefaultAsync(u => u.AdUsername.ToLower() == cleanedUserName.ToLower()
                                            && u.ApplicationName == "GestPR");
@@ -88,21 +102,15 @@ namespace GestPR.Controllers
                     return Unauthorized(new
                     {
                         Connected = false,
-                        Message = $"L'utilisateur '{cleanedUserName}' n'est pas configuré pour accéder à l'application GestPR."
+                        Message = $"L'utilisateur '{cleanedUserName}' n'est pas configuré dans GestPR."
                     });
                 }
 
-                // Vérification du statut du compte
                 if (dbUser.IsActive != 1)
                 {
-                    return StatusCode(403, new
-                    {
-                        Connected = false,
-                        Message = "Votre compte utilisateur est désactivé."
-                    });
+                    return StatusCode(403, new { Connected = false, Message = "Votre compte est désactivé." });
                 }
 
-                // Succès : Envoi des données de l'utilisateur connecté vers le Frontend
                 return Ok(new
                 {
                     Connected = true,
@@ -112,21 +120,118 @@ namespace GestPR.Controllers
                     Prenom = dbUser.Prenom,
                     Mail = dbUser.Mail,
                     Role = dbUser.Role,
-                    Site = dbUser.Site,
-                    RawIdentityUsed = rawUser, // Permet de valider que c'est bien l'AD de l'utilisateur distant qui est reçu
-                    Timestamp = DateTime.Now
+                    Site = dbUser.Site
                 });
             }
             catch (Exception ex)
             {
+                // Renvoie l'erreur explicite dans la réponse au lieu d'un 500 opaque
                 return StatusCode(500, new
                 {
                     Connected = false,
-                    Message = "Une erreur est survenue lors de la vérification de l'identité.",
-                    Error = ex.Message
+                    Message = "Erreur lors de la vérification de l'identité en base de données.",
+                    Details = ex.InnerException?.Message ?? ex.Message
                 });
             }
         }
+
+
+        //[HttpGet("windows-login")]
+
+        //public async Task<IActionResult> GetLogin()
+        //{
+        //    try
+        //    {
+        //        string? rawUser = null;
+
+        //        // --- MANIÈRE 1 : Variables serveur IIS (La méthode reine en déploiement IIS d'entreprise) ---
+        //        var serverVariables = HttpContext.Features.Get<Microsoft.AspNetCore.Http.Features.IServerVariablesFeature>();
+        //        if (serverVariables != null)
+        //        {
+        //            rawUser = serverVariables["LOGON_USER"] ?? serverVariables["AUTH_USER"];
+        //        }
+
+        //        // --- MANIÈRE 2 : Contexte utilisateur HTTP (S'appuie sur l'authentification Windows du protocole HTTP) ---
+        //        if (string.IsNullOrEmpty(rawUser))
+        //        {
+        //            rawUser = HttpContext.User?.Identity?.Name
+        //                      ?? HttpContext.User?.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
+        //        }
+
+        //        // --- SÉCURITÉ DEPLOIEMENT : Suppression absolue d'Environment.UserName ---
+        //        // Si on détecte un compte de service IIS à cause d'une mauvaise configuration système, on refuse
+        //        if (!string.IsNullOrEmpty(rawUser) &&
+        //            (rawUser.Contains("IIS APPPOOL", StringComparison.OrdinalIgnoreCase) ||
+        //             rawUser.Contains("NETWORK SERVICE", StringComparison.OrdinalIgnoreCase) ||
+        //             rawUser.Contains("SYSTEM", StringComparison.OrdinalIgnoreCase)))
+        //        {
+        //            rawUser = null; // On invalide pour forcer une erreur explicite d'authentification utilisateur
+        //        }
+
+        //        // --- VÉRIFICATION GLOBALE ---
+        //        if (string.IsNullOrEmpty(rawUser))
+        //        {
+        //            return Unauthorized(new
+        //            {
+        //                Connected = false,
+        //                Message = "Impossible d'identifier votre session Windows d'entreprise. Veuillez vérifier que l'authentification Windows est active sur votre navigateur et sur IIS."
+        //            });
+        //        }
+
+        //        // Nettoyage du domaine si présent (S_TANA_00\tsio700529 -> tsio700529)
+        //        string cleanedUserName = rawUser.Contains("\\")
+        //            ? rawUser.Split('\\')[1]
+        //            : rawUser;
+
+        //        // Recherche de l'utilisateur dans la base de données
+        //        var dbUser = await _context.ApplicationUsers
+        //            .FirstOrDefaultAsync(u => u.AdUsername.ToLower() == cleanedUserName.ToLower()
+        //                                   && u.ApplicationName == "GestPR");
+
+        //        if (dbUser == null)
+        //        {
+        //            return Unauthorized(new
+        //            {
+        //                Connected = false,
+        //                Message = $"L'utilisateur '{cleanedUserName}' n'est pas configuré pour accéder à l'application GestPR."
+        //            });
+        //        }
+
+        //        // Vérification du statut du compte
+        //        if (dbUser.IsActive != 1)
+        //        {
+        //            return StatusCode(403, new
+        //            {
+        //                Connected = false,
+        //                Message = "Votre compte utilisateur est désactivé."
+        //            });
+        //        }
+
+        //        // Succès : Envoi des données de l'utilisateur connecté vers le Frontend
+        //        return Ok(new
+        //        {
+        //            Connected = true,
+        //            Id = dbUser.Id,
+        //            Username = dbUser.AdUsername,
+        //            Nom = dbUser.Nom,
+        //            Prenom = dbUser.Prenom,
+        //            Mail = dbUser.Mail,
+        //            Role = dbUser.Role,
+        //            Site = dbUser.Site,
+        //            RawIdentityUsed = rawUser, // Permet de valider que c'est bien l'AD de l'utilisateur distant qui est reçu
+        //            Timestamp = DateTime.Now
+        //        });
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        return StatusCode(500, new
+        //        {
+        //            Connected = false,
+        //            Message = "Une erreur est survenue lors de la vérification de l'identité.",
+        //            Error = ex.Message
+        //        });
+        //    }
+        //}
 
         // ==========================================
         // 2. RECUPERER LES UTILISATEURS (Pour l'affichage)

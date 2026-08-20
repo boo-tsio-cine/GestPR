@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { demandeService, frsService, userService } from "../../../services/api";
+import { demandeService, frsService, userService, coursChangeService } from "../../../services/api";
 import { toast } from "sonner";
 import Nav from "../../nav/nav";
 import "./traitement.css";
@@ -133,6 +133,7 @@ export function TraitementDemande(){
     const [idDemandeGenere, setIdDemandeGenere] = useState(null);
     const [error, setError] = useState(null); 
     const [frs, setFrs] = useState([]);   
+    const [loadingCours, setLoadingCours] = useState(false);
 
     const [designationSelectionnee, setDesignationSelectionnee] = useState(null);
     const [historiqueArticles, setHistoriqueArticles] = useState([]);
@@ -145,7 +146,9 @@ export function TraitementDemande(){
                 demandeService.getDemande(id),
                 userService.getAll(),
             ]);
-            const d = res.data;
+            // GetById (backend) enveloppe la réponse dans ApiResponse { success, message, data },
+            // contrairement à GetAllAsync qui renvoie l'objet brut. On dépile donc "data" si présent.
+            const d = res.data?.data ?? res.data;
 
             if(!d) throw new Error("Aucune donnée reçue");
 
@@ -205,6 +208,33 @@ export function TraitementDemande(){
             ...prev, [field]: value
         }));
     };
+
+    // Récupère le dernier cours mis en cache Redis pour la devise sélectionnée,
+    // et pré-remplit le champ (l'utilisateur peut toujours le corriger manuellement).
+    const fetchDernierCours = async (devise) => {
+        if (!devise) return;
+        setLoadingCours(true);
+        try {
+            const res = await coursChangeService.getDernierCours(devise);
+            const cours = res?.data?.data?.cours ?? res?.data?.cours;
+            if (cours != null) {
+                setDossierData((prev) => ({ ...prev, cours: cours.toString() }));
+                toast.info(`Cours ${devise} pré-rempli (dernier saisi)`);
+            }
+        } catch (err) {
+            // Pas grave si ça échoue : l'utilisateur saisit simplement à la main
+            console.warn("Impossible de récupérer le cours en cache :", err.message);
+        } finally {
+            setLoadingCours(false);
+        }
+    };
+
+    useEffect(() => {
+        if (dossierData.unitcours) {
+            fetchDernierCours(dossierData.unitcours);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [dossierData.unitcours]);
 
     const updateSaisieArticle = (articleId, field, value) => {
         setSaisies((prev) => ({
@@ -603,8 +633,11 @@ export function TraitementDemande(){
                                      </select>
                                  </div>
                                 <div className="col-md-4">
-                                    <label className="form-label">Cours de change</label>
-                                    <input type="number" step="0.01" className="form-control" value={dossierData.cours} onChange={(e) => updateDossierField("cours", e.target.value)} required />
+                                    <label className="form-label">
+                                        Cours de change
+                                        {loadingCours && <span className="ms-2 spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true"></span>}
+                                    </label>
+                                    <input type="number" step="0.01" className="form-control" value={dossierData.cours} onChange={(e) => updateDossierField("cours", e.target.value)} disabled={loadingCours} required />
                                 </div>
                                 <div className="col-md-4">
                                     <label className="form-label">Montant FOB</label>
