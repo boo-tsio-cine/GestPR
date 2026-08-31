@@ -171,10 +171,15 @@ export const anomalyService = {
 };
 
 
-// Recherche d'articles Renaissance (le backend gère le token, jamais exposé au frontend)
-export const renaissanceService = {
-  searchArticles: (codeArticle) =>
-    api.get("/renaissance/articles", { params: { codeArticle } }),
+export const erpService = {
+  // Recherche dynamique des articles Renaissance par le paramètre codeArticle (PartCode)
+  getArticles: () => 
+    axios.get(`http://apierp.star.mg/ApiRenaissance/Articles`, {
+      params: {
+        // codeArticle: term,
+        sort: "GenerateDate"
+      }
+    })
 };
 
 
