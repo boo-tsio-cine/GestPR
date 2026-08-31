@@ -10,7 +10,7 @@ import { Button } from "../ui/button";
 import "./demandeur.css";
 import { useAuth } from "../../context/AuthContext";
 import Nav from "../nav/nav";
-import { articleService, demandeService, userService } from "../../services/api";
+import { articleService, demandeService, erpService, userService } from "../../services/api";
 import api from "../../services/api";
 import axios from "axios"; // Ensure axios is imported
 import AuditDialog from "../AuditDialog";
@@ -193,6 +193,61 @@ function Demandeur() {
         }
     }, [userId]);
 
+
+    const [codeArticleOptions, setCodeArticleOptions] = useState([]);
+    const [loadingArticles, setLoadingArticles] = useState(false);
+
+    const [erpArticles, setErpArticles] = useState([]);
+    // Charger les données ERP au montage
+    useEffect(() => {
+        const fetchErpData = async () => {
+            setLoadingArticles(true);
+            try {
+                const res = await erpService.getArticles();
+                const rawData = res.data?.Data || res.data || [];
+                setErpArticles(rawData);
+
+                // Extraction des Code Article uniques (ex: ItemGroup, Category, ou CodeArticle)
+                // Ajustez la propriété (ex: item.CodeArticle ou item.ItemGroup) selon la structure exacte retournée
+                const uniqueCategories = Array.from(
+                    new Set(rawData.map((item) => item.CodeArticle || item.ItemGroup || item.Category).filter(Boolean))
+                );
+
+                setCodeArticleOptions(uniqueCategories);
+
+                // Définir la valeur par défaut pour le premier lot si des catégories existent
+                if (uniqueCategories.length > 0) {
+                    const defaultCat = uniqueCategories[0];
+                    const firstDesignation = rawData.find(
+                        (item) => (item.CodeArticle || item.ItemGroup || item.Category) === defaultCat
+                    )?.PartCode || "";
+
+                    setLots((prevLots) =>
+                        prevLots.map((lot) => ({
+                            ...lot,
+                            codeArticle: lot.codeArticle || defaultCat,
+                            designation: lot.designation || firstDesignation
+                        }))
+                    );
+                }
+            } catch (err) {
+                console.error("Erreur lors de la récupération des données ERP:", err);
+                toast.error("Impossible de charger la liste des articles ERP");
+            } finally {
+                setLoadingArticles(false);
+            }
+        };
+
+        fetchErpData();
+    }, []);
+
+    // Fonction pour ajouter un nouveau lot avec le premier code de la liste par défaut
+    // const addLot = () => {
+    //     const defaultCode = codeArticleOptions[0] || "";
+    //     setLots((a) => [...a, { codeArticle: defaultCode, codeLot: "", designation: "", quantite: 1 }]);
+    // };
+    
+
     const handleSubmit = async (e) => {
         e.preventDefault();
 
@@ -262,6 +317,8 @@ function Demandeur() {
 
     const [auditDemandeId, setAuditDemandeId] = useState(null); // 👈 État pour la modal audit
 
+
+    
     return (    
         <main>
             <Nav/>
@@ -310,7 +367,25 @@ function Demandeur() {
                                                 onChange={(e) => updateLot(i, "designation", e.target.value)}
                                                 required
                                             />
-                                            
+                                            <div className="w-1/4">
+                                                <select
+                                                    className="form-select text-sm w-full input-hover rounded-md border border-gray-300 p-2"
+                                                    value={a.codeArticle}
+                                                    onChange={(e) => updateLot(i, "codeArticle", e.target.value)}
+                                                    disabled={loadingArticles}
+                                                    required
+                                                >
+                                                    {loadingArticles ? (
+                                                        <option value="">Chargement...</option>
+                                                    ) : (
+                                                        codeArticleOptions.map((code) => (
+                                                            <option key={code} value={code}>
+                                                                {code}
+                                                            </option>
+                                                        ))
+                                                    )}
+                                                </select>
+                                            </div>
                                             <Button
                                                 type="button"
                                                 variant="ghost"

@@ -2,7 +2,7 @@ using Microsoft.Extensions.Caching.Distributed;
 
 namespace GestPR.Service
 {
-    // Contrairement à DeviseService/NomenclatureService, il n'y a pas de table SQL
+    // Contrairement à DeviseService, il n'y a pas de table SQL
     // derrière : le cours est saisi manuellement par l'utilisateur. Redis sert ici
     // de mémoire clé-valeur pure pour retenir la dernière valeur saisie par devise,
     // et pré-remplir le formulaire lors du prochain traitement.

@@ -9,6 +9,7 @@ using GestPR.Service;
 using GestPR.Service.Audit;
 using GestPR.Service.Demandes;
 using GestPR.Service.Email;
+using GestPR.Service.MachineLearning;
 using GestPR.Service.Taux_Historic;
 using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Authentication.Negotiate;
@@ -170,6 +171,8 @@ namespace GestPR
 
             builder.Services.AddScoped<DeviseService>();
             builder.Services.AddScoped<CoursChangeService>();
+            builder.Services.AddScoped<AnomalyDetectionService>();
+            builder.Services.AddScoped<AchatDatasetService>();
 
             // Health Checks
             builder.Services.AddHealthChecks()

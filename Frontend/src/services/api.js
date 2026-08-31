@@ -163,4 +163,19 @@ export const articleService = {
   getByDemande: (idDemande) => api.get(`/articles?idDemande=${idDemande}`)
 };
 
+
+// Analyse d'anomalie sur un prix de revient (voir AnomalyDetectionService.cs)
+export const anomalyService = {
+  analyserPrix: (designation, codeLot, prixDeRevient) => 
+    api.post("/AnomalyDetection/analyser", { designation, codeLot, prixDeRevient },)
+};
+
+
+// Recherche d'articles Renaissance (le backend gère le token, jamais exposé au frontend)
+export const renaissanceService = {
+  searchArticles: (codeArticle) =>
+    api.get("/renaissance/articles", { params: { codeArticle } }),
+};
+
+
 export default api;

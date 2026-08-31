@@ -53,11 +53,21 @@
     border: 1px solid rgb(219, 205, 205);
     border-radius: 0 0 10px 10px;
     padding: 1rem;
-    margin-top: 5rem;
+    /* margin-top: 1rem; */
+
 } 
 
-.card-site{
+.card-id{
+    display: flex;
+    justify-content: space-between;
+}
+
+.ppo{
     text-align: center;
+}
+
+.card-site{
+    /* text-align: center; */
     font-weight: bold;
 }
 

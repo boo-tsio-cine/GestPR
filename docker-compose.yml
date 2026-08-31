@@ -14,6 +14,12 @@ services:
       - "1433:1433"
     volumes:
       - sqlserver_data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'Star2026!' -C -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
   # ----------------------------------------
   # 2. Base de données MongoDB (Journal d'audit)
@@ -37,7 +43,7 @@ services:
     ports:
       - "6379:6379"
 
- # ----------------------------------------
+  # ----------------------------------------
   # 4. Backend .NET 8 API
   # ----------------------------------------
   backend:
@@ -47,19 +53,20 @@ services:
       dockerfile: Dockerfile
     container_name: gestpr-api
     dns: 
+      - 10.123.240.40
+      - 10.123.240.41
       - 8.8.8.8
-      - 8.8.4.4
     ports:
       - "5000:8080"
     extra_hosts:
       - "host.docker.internal:host-gateway"
+      - "STASRV26005:host-gateway"
     environment:
       ASPNETCORE_ENVIRONMENT: "Development"
-      ConnectionStrings__DefaultConnection: "Server=host.docker.internal;Database=prix_revien_db;User Id=sa;Password=Star0000;TrustServerCertificate=True;Encrypt=False;"
+      ConnectionStrings__DefaultConnection: "Server=sqlserver,1433;Database=prix_revien_db;User Id=sa;Password=Star2026!;TrustServerCertificate=True;Encrypt=False;"
       MongoDbSetting__ConnectionString: "mongodb://mongodb:27017"
       MongoDbSetting__DatabaseName: "GestPR_Audit"
       ConnectionStrings__Redis: "redis:6379"
-      DOTNET_SYSTEM_NET_HTTP_SOCKETSHTTPHANDLER_HTTP2UNENCRYPTEDSUPPORT: "true"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
@@ -67,11 +74,13 @@ services:
       retries: 3
       start_period: 10s
     depends_on:
-      - sqlserver
-      - mongodb
-      - redis
+      sqlserver:
+        condition: service_healthy
+      mongodb:
+        condition: service_started
+      redis:
+        condition: service_started
 
-      
   # ----------------------------------------
   # 5. Frontend React
   # ----------------------------------------

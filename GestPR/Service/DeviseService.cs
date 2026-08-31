@@ -24,7 +24,7 @@ namespace GestPR.Service
 
             string cacheKey = "ref_devises_list";
 
-            // 1. Essayer de lire depuis Redis
+            // 1. Essaie de lire depuis Redis
             var cacheData = await _cache.GetStringAsync(cacheKey);
             if (!string.IsNullOrEmpty(cacheData))
             {

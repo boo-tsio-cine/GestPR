@@ -313,12 +313,13 @@ function DemandesTable({ data, empty, onDetail, onVoirAudit }) {
                             >{d.status}</data>
                         </div>
                         <div className="card-desc">
-                            <div className="card-site">
-                                <div>{d.site || "Site inconnu"}</div>
-                            </div>
+                            
                             <div className="card-id">
                                 <p>{d.nomDemandeur} {d.prenomDemandeur}</p>
-                                <p>{d.matricule}</p>
+                                <p className="ppo">{d.matricule}</p>
+                                <div className="card-site">
+                                    <div>{d.site || "Site inconnu"}</div>
+                                </div>
                             </div>
                             <div className="card-table">
                                 <div className="w-full overflow-hidden rounded-xl border-gray-200 bg-white shadow-sm">

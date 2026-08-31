@@ -170,15 +170,15 @@ export default function AuditDialog({ demandeId, onClose, open }) {
                                         }} />
                                         
                                         <div style={{ backgroundColor: '#f9fafb', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #f3f4f6' }}>
-                                            {/* <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
-                                                <span style={{ fontWeight: 600, fontSize: '0.875rem', color: '#111827' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                                                {/* <span style={{ fontWeight: 600, fontSize: '0.875rem', color: '#111827' }}>
                                                     {actionName}
-                                                </span>
+                                                </span> */}
                                                 <span style={{ fontSize: '0.75rem', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                                                     <Clock style={{ width: '0.75rem', height: '0.75rem' }} />
                                                     {dateVal ? new Date(dateVal).toLocaleDateString("fr-FR") : ''}
                                                 </span>
-                                            </div> */}
+                                            </div>
 
                                             <div style={{ fontSize: '0.75rem', color: '#4b5563', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                                 <User style={{ width: '0.75rem', height: '0.75rem', color: '#9ca3af' }} />
