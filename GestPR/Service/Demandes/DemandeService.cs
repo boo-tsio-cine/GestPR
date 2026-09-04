@@ -106,7 +106,9 @@ namespace GestPR.Service
                 DemandeurId = dto.DemandeurId,
                 Motif = dto.Motif ?? "En attente",
                 Status = "Nouvelle",
-                DateTime = DateTime.UtcNow
+                DateTime = DateTime.UtcNow,
+                CodeSociete = dto.CodeSociete?.Trim() ?? "",
+                CodeMagasin = dto.CodeMagasin?.Trim() ?? ""
             };
 
             // 4. Construire les articles
@@ -114,6 +116,8 @@ namespace GestPR.Service
             {
                 CodeLot = a.CodeLot.Trim().ToUpper(),
                 Designation = a.Designation.Trim(),
+                CodeArticle = a.CodeArticle?.Trim() ?? "",
+                DescArticle = a.DescArticle?.Trim() ?? ""
             }).ToList();
 
             // 5. Sauvegarder directement en base de données
@@ -168,7 +172,9 @@ namespace GestPR.Service
                     <tr style='border-bottom: 1px solid #ddd; text-align: left;'>
                         <td style='padding: 10px; border-right: 1px solid #ddd;'>{art.Id}</td>
                         <td style='padding: 10px; border-right: 1px solid #ddd;'>{art.Designation}</td>
-                        <td style='padding: 10px;'>{art.CodeLot}</td>
+                        <td style='padding: 10px; border-right: 1px solid #ddd;'>{art.CodeLot}</td> 
+                        <td style='padding: 10px; border-right: 1px solid #ddd;'>{art.CodeArticle}</td>
+                        <td style='padding: 10px;'>{art.DescArticle}</td>
                     </tr>";
                     }
 
@@ -204,9 +210,11 @@ namespace GestPR.Service
                     <table style='width: 100%; border-collapse: collapse; border: 1px solid #ddd;'>
                         <thead>
                             <tr style='background-color: #00b074; color: white; text-align: left;'>
-                                <th style='padding: 12px; border-right: 1px solid #ddd; width: 15%;'>Id Article</th>
-                                <th style='padding: 12px; border-right: 1px solid #ddd; width: 55%;'>Désignation</th>
-                                <th style='padding: 12px; width: 30%;'>Code Lot</th>
+                                <th style='padding: 12px; border-right: 1px solid #ddd; width: 10%;'>Id Article</th>
+                                <th style='padding: 12px; border-right: 1px solid #ddd; width: 22.5%;'>Désignation</th>
+                                <th style='padding: 12px; border-right: 1px solid #ddd; width: 22.5%;'>Code Lot</th>
+                                <th style='padding: 12px; border-right: 1px solid #ddd; width: 22.5%;'>Code Article</th>
+                                <th style='padding: 12px; border-right: 1px solid #ddd; width: 22.5%;'>Description</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -654,6 +662,7 @@ namespace GestPR.Service
                         Status = dema.Status,
                         CodeLot = art.CodeLot,
                         PrixDeRevient = art.PrixDeRevient
+
                     });
                 }
             }
@@ -686,13 +695,17 @@ namespace GestPR.Service
             DemandeurId = d.DemandeurId,
             PdfFileName = d.PdfFileName,
             Commentaire = d.Commentaire ?? "",
+            CodeMagasin= d.CodeMagasin ?? "",
+            CodeSociete= d.CodeSociete ?? "",
             Articles = d.Articles.Select(a => new ArticleResponseDto
             {
                 Id = a.Id,
                 CodeLot = a.CodeLot,
                 Designation = a.Designation,
                 DemandeId = d.Id,
-                PrixDeRevient = a.PrixDeRevient
+                PrixDeRevient = a.PrixDeRevient,
+                CodeArticle = a.CodeArticle,
+                DescArticle = a.DescArticle
             }).ToList()
         };
     }

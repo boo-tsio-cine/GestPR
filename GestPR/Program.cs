@@ -10,6 +10,7 @@ using GestPR.Service.Audit;
 using GestPR.Service.Demandes;
 using GestPR.Service.Email;
 using GestPR.Service.MachineLearning;
+using GestPR.Service.Renaissance;
 using GestPR.Service.Taux_Historic;
 using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Authentication.Negotiate;
@@ -173,6 +174,15 @@ namespace GestPR
             builder.Services.AddScoped<CoursChangeService>();
             builder.Services.AddScoped<AnomalyDetectionService>();
             builder.Services.AddScoped<AchatDatasetService>();
+            builder.Services.AddScoped<GestPR.Service.MachineLearning.ValidationDatasetService>();
+            builder.Services.AddScoped<GestPR.Service.MachineLearning.DelaiValidationService>();
+
+            // ⬇️ Ligne manquante : sans elle, RenaissanceDto reste un objet vide (BaseUrl="")
+            //    même si appsettings.json contient bien la section "RenaissanceApi".
+            builder.Services.Configure<GestPR.Dtos.RenaissanceDto>(
+                builder.Configuration.GetSection("RenaissanceApi"));
+
+            builder.Services.AddHttpClient<GestPR.Service.Renaissance.RenaissanceService>();
 
             // Health Checks
             builder.Services.AddHealthChecks()

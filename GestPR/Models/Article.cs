@@ -13,6 +13,14 @@ namespace GestPR.Models
 
         [Required]
         [MaxLength(100)]
+        public string CodeArticle { get; set; } = string.Empty;
+
+        [Required]
+        [MaxLength(100)]
+        public string DescArticle { get; set; } = string.Empty;
+
+        [Required]
+        [MaxLength(100)]
         public string Designation { get; set; } = string.Empty;
 
         [Required]

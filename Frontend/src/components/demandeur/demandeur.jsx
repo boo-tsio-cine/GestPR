@@ -10,7 +10,7 @@ import { Button } from "../ui/button";
 import "./demandeur.css";
 import { useAuth } from "../../context/AuthContext";
 import Nav from "../nav/nav";
-import { articleService, demandeService, erpService, userService } from "../../services/api";
+import { articleService, demandeService, directRenaissanceService, userService } from "../../services/api";
 import api from "../../services/api";
 import axios from "axios"; // Ensure axios is imported
 import AuditDialog from "../AuditDialog";
@@ -76,7 +76,9 @@ function Demandeur() {
                 lots: (d.articles ?? d.Articles ?? []).map((a) => ({
                     id: a.id ?? a.Id ?? 0,  
                     codeLot: a.codeLot ?? a.CodeLot ?? "",
-                    designation: a.designation ?? a.Designation ?? ""
+                    designation: a.designation ?? a.Designation ?? "",
+                    codeArticle: a.codeArticle ?? a.CodeArticle ?? "",
+                    description: a.descArticle ?? a.DescArticle ?? ""
                 }))
             }));
             setDemandes(demandesFormatees);
@@ -100,6 +102,9 @@ function Demandeur() {
                 id: a.id || a.Id,
                 codeLot: a.codeLot || a.CodeLot || "",
                 designation: a.designation || a.Designation || "",
+                motif: a.motif || a.Motif || "",
+                codeArticle: a.codeArticle || a.CodeArticle || "",
+                description: a.descArticle || a.DescArticle || ""
             }));
             setDetail({ ...demande, lots });
         } catch (err) {
@@ -194,52 +199,156 @@ function Demandeur() {
     }, [userId]);
 
 
-    const [codeArticleOptions, setCodeArticleOptions] = useState([]);
-    const [loadingArticles, setLoadingArticles] = useState(false);
+    // Les 3 catégories fixes proposées dans le champ "Désignation".
+    // Ce sont les termes envoyés à Renaissance comme filtre "codeArticle" (recherche par sous-chaîne).
+    // Code Magasin / Code Société : influencent la recherche d'articles Renaissance.
+    // Valeurs par défaut basées sur les tests réels (S4 / A), modifiables par l'utilisateur.
+    const [codeMagasin, setCodeMagasin] = useState("");
+    const [codeSociete, setCodeSociete] = useState("");
 
-    const [erpArticles, setErpArticles] = useState([]);
-    // Charger les données ERP au montage
-    useEffect(() => {
-        const fetchErpData = async () => {
-            setLoadingArticles(true);
-            try {
-                const res = await erpService.getArticles();
-                const rawData = res.data?.Data || res.data || [];
-                setErpArticles(rawData);
+    const CATEGORIES_DESIGNATION = [
+        { value: "BOUCHON", label: "Bouchon" },
+        { value: "PREF", label: "Preform" },
+        { value: "CAPCAP", label: "Capcap" },
+    ];
 
-                // Extraction des Code Article uniques (ex: ItemGroup, Category, ou CodeArticle)
-                // Ajustez la propriété (ex: item.CodeArticle ou item.ItemGroup) selon la structure exacte retournée
-                const uniqueCategories = Array.from(
-                    new Set(rawData.map((item) => item.CodeArticle || item.ItemGroup || item.Category).filter(Boolean))
-                );
+    // Résultats (PartCode) de la recherche Renaissance, par ligne de lot (clé = index i)
+    const [partCodesByRow, setPartCodesByRow] = useState({});
+    const [loadingPartCodesByRow, setLoadingPartCodesByRow] = useState({});
 
-                setCodeArticleOptions(uniqueCategories);
+    // Appelée quand l'utilisateur choisit une catégorie dans "Désignation" :
+    // va chercher chez Renaissance tous les PartCode correspondants, pour peupler le 2e menu.
+    const fetchPartCodes = async (i, categorie) => {
+        if (!categorie) {
+            setPartCodesByRow((prev) => ({ ...prev, [i]: [] }));
+            return;
+        }
+        setLoadingPartCodesByRow((prev) => ({ ...prev, [i]: true }));
+        try {
+            const data = await directRenaissanceService.getArticlesByCode(categorie, codeMagasin, codeSociete);
+            const articlesList = data?.Data || data || [];
+            const partCodes = [...new Set(articlesList.map((item) => item.PartCode).filter(Boolean))];
+            setPartCodesByRow((prev) => ({ ...prev, [i]: partCodes }));
+        } catch (err) {
+            console.error("Erreur d'accès direct à l'ERP Renaissance :", err);
+            toast.error("Impossible de récupérer les articles Renaissance pour cette catégorie.");
+            setPartCodesByRow((prev) => ({ ...prev, [i]: [] }));
+        } finally {
+            setLoadingPartCodesByRow((prev) => ({ ...prev, [i]: false }));
+        }
+    };
 
-                // Définir la valeur par défaut pour le premier lot si des catégories existent
-                if (uniqueCategories.length > 0) {
-                    const defaultCat = uniqueCategories[0];
-                    const firstDesignation = rawData.find(
-                        (item) => (item.CodeArticle || item.ItemGroup || item.Category) === defaultCat
-                    )?.PartCode || "";
+    // 2. (fonction retirée : fetchProduitByCode était du code mort, jamais appelé,
+    //    et écrivait par erreur dans "designation" au lieu de "description")
 
-                    setLots((prevLots) =>
-                        prevLots.map((lot) => ({
-                            ...lot,
-                            codeArticle: lot.codeArticle || defaultCat,
-                            designation: lot.designation || firstDesignation
-                        }))
-                    );
+   // États pour gérer les listes par ligne
+const [articlesByRow, setArticlesByRow] = useState({}); // Articles issus d'une recherche par désignation
+const [allArticles, setAllArticles] = useState([]);     // Liste globale des articles si besoin
+const [loadingRow, setLoadingRow] = useState({});
+
+// 1. L'utilisateur sélectionne une DÉSIGNATION
+const handleDesignationChange = async (index, designationValue) => {
+    updateLot(index, "designation", designationValue);
+    updateLot(index, "codeArticle", "");
+    updateLot(index, "description", "");
+
+    if (!designationValue) {
+        setArticlesByRow((prev) => ({ ...prev, [index]: [] }));
+        return;
+    }
+
+    setLoadingRow((prev) => ({ ...prev, [index]: true }));
+
+    try {
+        const data = await directRenaissanceService.getArticlesByCode(
+            designationValue,
+            codeMagasin,
+            codeSociete
+        );
+        const articlesBruts = data?.Data || data || [];
+
+        // ⚠️ /Articles ne renvoie PAS PartDesc1 — il faut interroger /Produit
+        // pour CHAQUE PartCode trouvé, afin de récupérer sa vraie description.
+        const codesUniques = [...new Set(articlesBruts.map((item) => item.PartCode).filter(Boolean))];
+
+        const articles = await Promise.all(
+            codesUniques.map(async (partCode) => {
+                try {
+                    const detail = await directRenaissanceService.getProduitBycode(partCode, codeMagasin, codeSociete);
+                    const produits = detail?.Data || detail || [];
+                    const produit = Array.isArray(produits) ? produits[0] : produits;
+                    return {
+                        PartCode: partCode,
+                        PartDesc1: produit?.PartDesc1 || partCode, // repli sur le code si pas de description trouvée
+                    };
+                } catch (err) {
+                    console.error(`Impossible de récupérer la description pour ${partCode} :`, err);
+                    return { PartCode: partCode, PartDesc1: partCode };
                 }
-            } catch (err) {
-                console.error("Erreur lors de la récupération des données ERP:", err);
-                toast.error("Impossible de charger la liste des articles ERP");
-            } finally {
-                setLoadingArticles(false);
-            }
-        };
+            })
+        );
 
-        fetchErpData();
-    }, []);
+        setArticlesByRow((prev) => ({ ...prev, [index]: articles }));
+
+        // Si une seule Description (PartDesc1) existe pour cette désignation
+        const descriptionsUniques = [
+            ...new Set(articles.map((item) => item.PartDesc1).filter(Boolean))
+        ];
+
+        if (descriptionsUniques.length === 1) {
+            updateLot(index, "description", descriptionsUniques[0]);
+            
+            // Auto-sélection du Code Article s'il est unique
+            const codesUniquesFinal = [...new Set(articles.map((item) => item.PartCode).filter(Boolean))];
+            if (codesUniquesFinal.length === 1) {
+                updateLot(index, "codeArticle", codesUniquesFinal[0]);
+            }
+        }
+    } catch (err) {
+        console.error("Erreur d'accès à l'ERP Renaissance :", err);
+        toast.error("Impossible de récupérer les articles.");
+        setArticlesByRow((prev) => ({ ...prev, [index]: [] }));
+    } finally {
+        setLoadingRow((prev) => ({ ...prev, [index]: false }));
+    }
+};
+
+// 2. L'utilisateur sélectionne un CODE ARTICLE dans la liste
+const handleCodeArticleChange = (index, codeArticle) => {
+    updateLot(index, "codeArticle", codeArticle);
+
+    if (!codeArticle) return;
+
+    const articles = articlesByRow[index] || [];
+    const matchedArticle = articles.find((a) => a.PartCode === codeArticle);
+
+    if (matchedArticle && matchedArticle.PartDesc1) {
+        updateLot(index, "description", matchedArticle.PartDesc1);
+    }
+};
+
+// 3. L'utilisateur sélectionne une DESCRIPTION (PartDesc1) dans la liste
+const handleDescriptionChange = (index, selectedDesc) => {
+    updateLot(index, "description", selectedDesc);
+
+    const articles = articlesByRow[index] || [];
+    
+    // Trouver l'article correspondant à la description choisie
+    const matchedArticle = articles.find((a) => a.PartDesc1 === selectedDesc);
+
+    if (matchedArticle) {
+        // Remplir le Code Article automatiquement
+        if (matchedArticle.PartCode) {
+            updateLot(index, "codeArticle", matchedArticle.PartCode);
+        }
+
+        // Remplir la Désignation automatiquement si elle provient de l'article ERP
+        const designationERP = matchedArticle.Category || matchedArticle.FamilleArticle || matchedArticle.PartGroup;
+        if (designationERP) {
+            updateLot(index, "designation", designationERP);
+        }
+    }
+};
 
     // Fonction pour ajouter un nouveau lot avec le premier code de la liste par défaut
     // const addLot = () => {
@@ -256,6 +365,8 @@ function Demandeur() {
             .map((a) => ({
                 codeLot: a.codeLot.trim(),
                 designation: a.designation.trim(),
+                codeArticle: (a.codeArticle || "").trim(),
+                description: (a.description || "").trim(),
             }));
 
         if (cleanLots.length === 0) {
@@ -274,9 +385,13 @@ function Demandeur() {
             const payload = {
                 demandeurId: parseInt(userId),
                 motif: "",
+                codeSociete: codeSociete,
+                codeMagasin: codeMagasin,
                 articles: cleanLots.map((lot) => ({
                     codeLot: lot.codeLot,
-                    designation: lot.designation
+                    designation: lot.designation,
+                    codeArticle: lot.codeArticle,
+                    descArticle: lot.description
                 }))
             };
 
@@ -350,54 +465,136 @@ function Demandeur() {
                                         <Plus className="h-4 w-4" /> Ajouter un lot
                                     </Button>
                                 </div>
-                                <div className="space-y-2">
-                                    {lots.map((a, i) => (
-                                        <div key={i} className="form-demande">
-                                            <Input
-                                                className="col-span-3 input-hover"
-                                                placeholder="Code Lot"
-                                                value={a.codeLot}
-                                                onChange={(e) => updateLot(i, "codeLot", e.target.value)}
-                                                required
-                                            />
-                                            <Input
-                                                className="col-span-6 input-hover"
-                                                placeholder="Désignation"
-                                                value={a.designation}
-                                                onChange={(e) => updateLot(i, "designation", e.target.value)}
-                                                required
-                                            />
-                                            <div className="w-1/4">
-                                                <select
-                                                    className="form-select text-sm w-full input-hover rounded-md border border-gray-300 p-2"
-                                                    value={a.codeArticle}
-                                                    onChange={(e) => updateLot(i, "codeArticle", e.target.value)}
-                                                    disabled={loadingArticles}
-                                                    required
-                                                >
-                                                    {loadingArticles ? (
-                                                        <option value="">Chargement...</option>
-                                                    ) : (
-                                                        codeArticleOptions.map((code) => (
-                                                            <option key={code} value={code}>
-                                                                {code}
+
+                                <div className="d-flex gap-3 mb-2">
+                                    <div className="">
+                                        <Label className="text-xs text-gray-500">Code Magasin</Label><br />
+                                        <Input
+                                            className="input-hover"
+                                            placeholder="ex: S4"
+                                            value={codeMagasin}
+                                            onChange={(e) => setCodeMagasin(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="">
+                                        <Label className="text-xs text-gray-500">Code Société</Label><br />
+                                        <Input
+                                            className="input-hover"
+                                            placeholder="ex: A"
+                                            value={codeSociete}
+                                            onChange={(e) => setCodeSociete(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3">
+                                    {lots.map((a, i) => {
+                                        const currentArticles = articlesByRow[i] || [];
+                                        const availableCodes = [...new Set(currentArticles.map((item) => item.PartCode).filter(Boolean))];
+                                        const availableDescriptions = [...new Set(currentArticles.map((item) => item.PartDesc1).filter(Boolean))];
+
+                                        const isSingleDescription = availableDescriptions.length === 1;
+
+                                        return (
+                                            <div key={i} className="form-demande grid grid-cols-12 gap-2 items-center border-b pb-3">
+                                                <div className="art" >
+                                                    {/* 1. Code Lot (Seul champ texte de saisie) */}
+                                                    <div className="col-span-3">
+                                                        <Input
+                                                            className="input-hover"
+                                                            placeholder="Code Lot"
+                                                            value={a.codeLot || ""}
+                                                            onChange={(e) => updateLot(i, "codeLot", e.target.value)}
+                                                            required
+                                                        />
+                                                    </div>
+
+                                                    {/* 2. Désignation (SELECT) */}
+                                                    <div className="col-span-3">
+                                                        <select
+                                                            className="form-select text-sm w-full input-hover rounded-md border border-gray-300 p-2"
+                                                            value={a.designation || ""}
+                                                            onChange={(e) => handleDesignationChange(i, e.target.value)}
+                                                            required
+                                                        >
+                                                            <option value="">Sélectionner une désignation</option>
+                                                            {CATEGORIES_DESIGNATION.map((cat) => (
+                                                                <option key={cat.value} value={cat.value}>
+                                                                    {cat.label}
+                                                                </option>
+                                                            ))}
+                                                            {/* Option dynamique si la désignation provient de l'ERP */}
+                                                            {a.designation && !CATEGORIES_DESIGNATION.some((c) => c.value === a.designation) && (
+                                                                <option value={a.designation}>{a.designation}</option>
+                                                            )}
+                                                        </select>
+                                                    </div>
+
+                                                    {/* 3. Code Article (SELECT) */}
+                                                    <div className="col-span-3">
+                                                        <select
+                                                            className="form-select text-sm w-full input-hover rounded-md border border-gray-300 p-2"
+                                                            value={a.codeArticle || ""}
+                                                            onChange={(e) => handleCodeArticleChange(i, e.target.value)}
+                                                            disabled={loadingRow[i] || availableCodes.length === 0}
+                                                        >
+                                                            <option value="">
+                                                                {availableCodes.length === 0 ? "Choisir désignation d'abord" : "Sélectionner un code"}
                                                             </option>
-                                                        ))
-                                                    )}
-                                                </select>
+                                                            {availableCodes.map((code) => (
+                                                                <option key={code} value={code}>
+                                                                    {code}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+
+                                                    {/* 4. Description (PartDesc1) - Readonly ou SELECT */}
+                                                    <div className="col-span-3">
+                                                        {isSingleDescription ? (
+                                                            // Champ figé en lecture seule s'il n'y a qu'une seule description disponible
+                                                            <Input
+                                                                className="bg-gray-100 text-gray-700 cursor-not-allowed text-sm p-2 rounded-md border"
+                                                                value={a.description || availableDescriptions[0] || ""}
+                                                                readOnly
+                                                                placeholder="Description unique"
+                                                            />
+                                                        ) : (
+                                                            // Liste déroulante des descriptions si plusieurs choix existent
+                                                            <select
+                                                                className="form-select text-sm w-full input-hover rounded-md border border-gray-300 p-2"
+                                                                value={a.description || ""}
+                                                                onChange={(e) => handleDescriptionChange(i, e.target.value)}
+                                                                disabled={loadingRow[i] || availableDescriptions.length === 0}
+                                                            >
+                                                                <option value="">
+                                                                    {availableDescriptions.length === 0 ? "Aucune description" : "Sélectionner une description"}
+                                                                </option>
+                                                                {availableDescriptions.map((desc, idx) => (
+                                                                    <option key={idx} value={desc}>
+                                                                        {desc}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* 5. Supprimer */}
+                                                <div className="col-span-1 text-center">
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => removeLot(i)}
+                                                        disabled={lots.length === 1}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
                                             </div>
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="icon"
-                                                className="col-span-1"
-                                                onClick={() => removeLot(i)}
-                                                disabled={lots.length === 1}
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </div>
 
@@ -444,7 +641,7 @@ function Demandeur() {
                                             <select id="statusFilter" className="form-select" value={filtrerStatus} onChange={(e) => setFiltrerStatus(e.target.value)}>
                                                 <option value="">Tous</option>
                                                 <option value="Nouvelle">Nouvelle</option>
-                                                <option value="En attente">En attente</option>
+                                                <option value="En cours">En cours</option>
                                                 <option value="Validée">Validée</option>
                                                 <option value="Refusée">Refusée</option>
                                             </select>
@@ -505,6 +702,8 @@ function Demandeur() {
                                         <TableHead className="table-dialog-head">IdArticle</TableHead>
                                         <TableHead className="table-dialog-head">Code Lot</TableHead>
                                         <TableHead className="table-dialog-head">Désignation</TableHead>
+                                        <TableHead className="table-dialog-head">Code Article</TableHead>
+                                        <TableHead className="table-dialog-head">Description</TableHead>
                                         <TableHead className="table-dialog-head">Motif</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -514,6 +713,8 @@ function Demandeur() {
                                             <TableCell>{String(a.id).padStart(3, '0')}</TableCell>
                                             <TableCell className="font-mono">{a.codeLot || "—"}</TableCell>
                                             <TableCell>{a.designation || "—"}</TableCell>
+                                            <TableCell>{a.codeArticle || "—"}</TableCell>
+                                            <TableCell>{a.description || "—"}</TableCell>
                                             <TableCell>{detail.motif || "—"}</TableCell>
                                         </TableRow>
                                     ))}

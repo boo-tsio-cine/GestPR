@@ -10,6 +10,8 @@ namespace GestPR.Dtos
         public string Designation { get; set; } = "";
         public int DemandeId { get; set; }
         public decimal PrixDeRevient {get; set;}
+        public string CodeArticle { get; set; } = "";
+        public string DescArticle { get; set; } = "";
     }
 
 
@@ -17,6 +19,8 @@ namespace GestPR.Dtos
     {
         public int DemandeurId { get; set; }
         public string? Motif { get; set; }
+        public string? CodeSociete { get; set; }
+        public string? CodeMagasin { get; set; }
         public List<ArticleCreateDto> Articles { get; set; } = new();
     }
 
@@ -27,6 +31,8 @@ namespace GestPR.Dtos
         public string Designation { get; set; } = "";
         public int DemandeId { get; set; }
         public decimal PrixDeRevient {get;set;}
+        public string CodeArticle { get; set; } = "";
+        public string DescArticle { get; set; } = "";
     }
 
     public class DemandeAvecArticleResponseDto
@@ -39,6 +45,8 @@ namespace GestPR.Dtos
         public string? PdfFileName { get; set; } // Enregistre bien ce fichier !
         public string? Commentaire { get; set; }
         public decimal PrixDeRevient { get; set; }
+        public string? CodeSociete { get; set; }
+        public string? CodeMagasin { get; set; }
 
         public List<ArticleResponseDto> Articles { get; set; } = new();
     }

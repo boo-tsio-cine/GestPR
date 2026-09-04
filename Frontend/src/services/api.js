@@ -20,6 +20,12 @@ const api = axios.create({
   },
 });
 
+// récupération renaissance
+const RENAISSANCE_BASE_URL = 'http://apierp.star.mg/ApiRenaissance';
+const CLE_API = 'lacleSecreteStarAPIRenaissancev1'; // Clé API distante
+
+let cachedToken = null;
+
 // ✅ Intercepteur — ajoute le token automatiquement uniquement s'il existe
 api.interceptors.request.use((config) => {
   const stored = localStorage.getItem("gestpr_user");
@@ -40,6 +46,9 @@ api.interceptors.request.use((config) => {
 }, (error) => {
   return Promise.reject(error);
 });
+
+
+
 
 // ✅ Intercepteur — si 401 → rediriger vers login
 api.interceptors.response.use(
@@ -171,16 +180,84 @@ export const anomalyService = {
 };
 
 
-export const erpService = {
-  // Recherche dynamique des articles Renaissance par le paramètre codeArticle (PartCode)
-  getArticles: () => 
-    axios.get(`http://apierp.star.mg/ApiRenaissance/Articles`, {
-      params: {
-        // codeArticle: term,
-        sort: "GenerateDate"
-      }
-    })
+// Renaissance
+// Renaissance
+export const directRenaissanceService = {
+    // 1. Récupération du Token depuis l'ERP distant
+    getToken: async () => {
+        if (cachedToken) return cachedToken;
+
+        const formData = new FormData();
+        formData.append('cleAPI', CLE_API);
+
+        const response = await axios.post(`${RENAISSANCE_BASE_URL}/Token`, formData);
+        
+        // Extraction du token (selon la structure de réponse Renaissance)
+        cachedToken = response.data?.Value || response.data?.token || response.data;
+        return cachedToken;
+    },
+
+    // 2. Appel direct à http://apierp.star.mg/ApiRenaissance/Articles
+    getArticlesByCode: async (codeArticle, codeMagasin = 'S4', codeSociete = 'A') => {
+        try {
+            const token = await directRenaissanceService.getToken();
+
+            const response = await axios.get(`${RENAISSANCE_BASE_URL}/Articles`, {
+                params: {
+                    codeArticle: codeArticle,
+                    codeMagasin: codeMagasin,
+                    codeSociete: codeSociete
+                },
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            });
+
+            return response.data;
+        } catch (error) {
+            // Si le token a expiré (401), on vide le cache et on réessaie une fois
+            if (error.response && error.response.status === 401) {
+                cachedToken = null;
+                const newToken = await directRenaissanceService.getToken();
+                const retryResponse = await axios.get(`${RENAISSANCE_BASE_URL}/Articles`, {
+                    params: { codeArticle: codeArticle, codeMagasin: codeMagasin, codeSociete: codeSociete },
+                    headers: { Authorization: `Bearer ${newToken}` }
+                });
+                return retryResponse.data;
+            }
+            throw error;
+        }
+    }, // <-- AJOUT DE LA VIRGULE ICI
+
+    // 3. Appel direct à http://apierp.star.mg/ApiRenaissance/Produit
+    getProduitBycode: async (codeProduit, codeMagasin = 'S4', codeSociete = 'A') => {
+        try {
+            const token = await directRenaissanceService.getToken();
+
+            const response = await axios.get(`${RENAISSANCE_BASE_URL}/Produit`, {
+                params: {
+                    codeProduit: codeProduit,
+                    codeMagasin: codeMagasin,
+                    codeSociete: codeSociete
+                },
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            });
+
+            return response.data;
+        } catch (error) {
+            if (error.response && error.response.status === 401) {
+                cachedToken = null;
+                const newToken = await directRenaissanceService.getToken();
+                const retryResponse = await axios.get(`${RENAISSANCE_BASE_URL}/Produit`, {
+                    params: { codeProduit: codeProduit, codeMagasin: codeMagasin, codeSociete: codeSociete },
+                    headers: { Authorization: `Bearer ${newToken}` }
+                });
+                return retryResponse.data;
+            }
+            throw error;
+        }
+    }
 };
-
-
 export default api;

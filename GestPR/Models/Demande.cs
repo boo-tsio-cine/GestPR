@@ -19,6 +19,13 @@ namespace GestPR.Models
         [MaxLength(1000)]
         public string? Commentaire { get; set; }
 
+        [MaxLength(100)]
+        public string CodeSociete { get; set; } = "";
+
+        [MaxLength(100)]
+        public string CodeMagasin { get; set; } = "";
+
+
 
         [Required]
         public DateTime DateTime { get; set; } = DateTime.UtcNow;
