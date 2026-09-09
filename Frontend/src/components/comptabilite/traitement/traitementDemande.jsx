@@ -811,7 +811,7 @@ export function TraitementDemande(){
                             </div>
                         </div>
 
-                        <div className="card mt-1 p-4">
+                        <div className="card mt-1 p-5">
                             <div className="table-responsive">
                                 <table className="table table-bordered table-sm align-middle">
                                     <thead className="table-light">
@@ -835,13 +835,13 @@ export function TraitementDemande(){
                                                         {label && <span className="badge bg-info text-dark ms-1">{label}</span>}
                                                         <br />
                                                         <small className="text-muted">{lot.designation}</small>
-                                                        <button 
+                                                        <button
                                                             type="button" 
                                                             className="btn btn-sm btn-link text-primary p-0 ms-2"
                                                             onClick={() => voirHistorique(lot.designation)}
                                                             title="Voir l'historique de cette désignation"
                                                         >
-                                                             Historique
+                                                            Historique
                                                         </button>
                                                         <button 
                                                             type="button" 

@@ -40,11 +40,14 @@
     <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.16.0" />
     <PackageReference Include="Microsoft.ML" Version="5.0.0" />
     <PackageReference Include="MongoDB.Driver" Version="3.11.0" />
+    <PackageReference Include="PdfPig" Version="0.1.16" />
+    <PackageReference Include="PDFtoImage" Version="5.4.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.8.1" />
     <PackageReference Include="System.Data.SqlClient" Version="4.9.1" />
     <PackageReference Include="System.DirectoryServices" Version="10.0.9" />
     <PackageReference Include="System.DirectoryServices.AccountManagement" Version="10.0.9" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.16.0" />
+    <PackageReference Include="Tesseract" Version="5.2.0" />
   </ItemGroup>
 
   <ItemGroup>

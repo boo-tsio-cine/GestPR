@@ -25,11 +25,11 @@ namespace GestPR.Service.MachineLearning
 
     public class DelaiValidationService
     {
-        private readonly ValidationDatasetService _datasetService;
+        private readonly IValidationDatasetService _datasetService;
         private readonly MLContext _mlContext;
         private readonly string _modelPath;
 
-        public DelaiValidationService(ValidationDatasetService datasetService, IWebHostEnvironment env)
+        public DelaiValidationService(IValidationDatasetService datasetService, IWebHostEnvironment env)
         {
             _datasetService = datasetService;
             _mlContext = new MLContext(seed: 1);
@@ -62,6 +62,9 @@ namespace GestPR.Service.MachineLearning
             IDataView trainingData = _mlContext.Data.LoadFromEnumerable(inputs);
 
             var pipeline = _mlContext.Transforms.Categorical.OneHotEncoding("ValidateurEncoded", nameof(DelaiModelInput.ValidateurId))
+                // Normalisation indispensable : sans elle, Montant (échelle ~100k-750k) écrase
+                // complètement ValidateurEncoded (échelle 0/1), et SDCA n'apprend quasiment rien.
+                .Append(_mlContext.Transforms.NormalizeMeanVariance(nameof(DelaiModelInput.Montant)))
                 .Append(_mlContext.Transforms.Concatenate("Features", nameof(DelaiModelInput.Montant), "ValidateurEncoded"))
                 .Append(_mlContext.Regression.Trainers.Sdca(labelColumnName: nameof(DelaiModelInput.NbJours), featureColumnName: "Features"));
 

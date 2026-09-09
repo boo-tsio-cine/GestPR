@@ -16,6 +16,14 @@ RUN echo "openssl_conf = default_conf" > /tmp/openssl.cnf && \
 # Copie des fichiers
 COPY ./bin/Release/net8.0/publish/ .
 
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    tesseract-ocr \
+    tesseract-ocr-fra \
+    libgdiplus \
+    fontconfig \
+    libx11-6 \
+    && rm -rf /var/lib/apt/lists/*
+
 USER app
 
 EXPOSE 8080

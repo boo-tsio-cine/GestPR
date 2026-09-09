@@ -7,7 +7,7 @@ using MongoDB.Driver;
 
 namespace GestPR.Service.MachineLearning
 {
-    public class ValidationDatasetService
+    public class ValidationDatasetService : IValidationDatasetService
     {
         private readonly AppDbContext _context;
         private readonly IMongoCollection<AuditLog> _auditCollection;

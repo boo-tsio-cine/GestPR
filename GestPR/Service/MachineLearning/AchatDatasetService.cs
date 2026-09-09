@@ -1,13 +1,12 @@
-﻿using GestPR.Data;
+using GestPR.Data;
 using GestPR.Dtos;
 using Microsoft.EntityFrameworkCore;
 
 namespace GestPR.Service.MachineLearning
 {
-    public class AchatDatasetService
+    public class AchatDatasetService : IAchatDatasetService
     {
         private readonly AppDbContext _context;
-
 
         public AchatDatasetService(AppDbContext context)
         {
@@ -26,7 +25,6 @@ namespace GestPR.Service.MachineLearning
             public string Status { get; set; } = "";
             public int DemandeurId { get; set; }
         }
-
 
         // Extraction (jointure Article + Demande) + nettoyage, réutilisé par toutes les vues du dataset
         // (par désignation, par CodeLot, futurs regroupements...) pour ne jamais dupliquer cette logique.
@@ -47,51 +45,11 @@ namespace GestPR.Service.MachineLearning
                         DateTime = d.DateTime,
                         Status = d.Status,
                         DemandeurId = d.DemandeurId
-                    }
-                )
-                .ToListAsync();
-
-            // 2. NETTOYAGE : trim + exclusion des lignes clairement invalides (prix à 0)
-            return brut
-               .Select(x => new AchatBrut
-               {
-                   ArticleId = x.ArticleId,
-                   CodeLot = x.CodeLot.Trim(),
-                   Designation = x.Designation.Trim(),
-                   PrixDeRevient = x.PrixDeRevient,
-                   DemandeId = x.DemandeId,
-                   DateTime = x.DateTime,
-                   Status = x.Status,
-                   DemandeurId = x.DemandeurId
-               })
-               .Where(x => x.PrixDeRevient > 0) // exclut les lignes à prix 0 (saisies incomplètes/invalides)
-               .ToList();
-        }
-
-
-        // Vue "par désignation" : utilisée pour l'export CSV et l'entraînement ML.NET
-        public async Task<List<AchatDatasetRow>> GetDatasetAsync()
-        {
-            // 1. EXTRACTION : jointure Article + Demande
-            var brut = await _context.Article
-                .Join(_context.Demande,
-                    a => a.DemandeId,
-                    d => d.Id,
-                    (a, d) => new AchatBrut
-                    {
-                        ArticleId = a.Id,
-                        CodeLot = a.CodeLot,
-                        Designation = a.Designation,
-                        PrixDeRevient = a.PrixDeRevient,
-                        DemandeId = d.Id,
-                        DateTime = d.DateTime,
-                        Status = d.Status,
-                        DemandeurId = d.DemandeurId
                     })
                 .ToListAsync();
 
             // 2. NETTOYAGE : trim + exclusion des lignes clairement invalides (prix à 0)
-            var nettoye = brut
+            return brut
                 .Select(x => new AchatBrut
                 {
                     ArticleId = x.ArticleId,
@@ -105,8 +63,14 @@ namespace GestPR.Service.MachineLearning
                 })
                 .Where(x => x.PrixDeRevient > 0) // exclut les lignes à prix 0 (saisies incomplètes/invalides)
                 .ToList();
+        }
 
-            // 3. STRUCTURATION : statistiques par désignation (moyenne, écart-type)
+        // Vue "par désignation" : utilisée pour l'export CSV et l'entraînement ML.NET
+        public async Task<List<AchatDatasetRow>> GetDatasetAsync()
+        {
+            var nettoye = await GetNettoyeAsync();
+
+            // STRUCTURATION : statistiques par désignation (moyenne, écart-type)
             var statsParDesignation = nettoye
                 .GroupBy(x => x.Designation, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(
@@ -123,7 +87,7 @@ namespace GestPR.Service.MachineLearning
                     },
                     StringComparer.OrdinalIgnoreCase);
 
-            // 4. ENRICHISSEMENT + marquage transparent des données suspectes (test/placeholder)
+            // ENRICHISSEMENT + marquage transparent des données suspectes (test/placeholder)
             var dataset = nettoye.Select(x =>
             {
                 var stats = statsParDesignation[x.Designation];
@@ -160,9 +124,7 @@ namespace GestPR.Service.MachineLearning
             .ToList();
 
             return dataset;
-
         }
-
 
         // Vue "par CodeLot" : alerte simple et directement explicable — si un même CodeLot
         // a des prix très différents d'une ligne à l'autre, c'est suspect (double saisie, erreur, fraude...).
@@ -229,7 +191,6 @@ namespace GestPR.Service.MachineLearning
             double ecartType = Math.Sqrt(variance);
             return (prix.Count, moyenne, ecartType);
         }
-
         // Le prix le plus RÉCENT enregistré pour cette désignation — plus facile à comprendre
         // pour un utilisateur métier qu'une moyenne statistique ("pourquoi c'est différent de la moyenne ?").
         public async Task<(DateTime? Date, decimal? Prix)> GetDernierPrixDesignationAsync(string designation)
@@ -242,6 +203,5 @@ namespace GestPR.Service.MachineLearning
 
             return dernier == null ? (null, null) : (dernier.DateTime, dernier.PrixDeRevient);
         }
-
     }
 }

@@ -1,4 +1,4 @@
-﻿using GestPR.Dtos;
+using GestPR.Dtos;
 using Microsoft.ML;
 using Microsoft.ML.Data;
 
@@ -39,11 +39,11 @@ namespace GestPR.Service.MachineLearning
 
     public class AnomalyDetectionService
     {
-        private readonly AchatDatasetService _datasetService;
+        private readonly IAchatDatasetService _datasetService;
         private readonly MLContext _mlContext;
         private readonly string _modelPath;
 
-        public AnomalyDetectionService(AchatDatasetService datasetService, IWebHostEnvironment env)
+        public AnomalyDetectionService(IAchatDatasetService datasetService, IWebHostEnvironment env)
         {
             _datasetService = datasetService;
             _mlContext = new MLContext(seed: 1); // seed fixe : résultats reproductibles pour la démo

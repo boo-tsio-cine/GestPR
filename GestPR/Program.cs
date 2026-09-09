@@ -174,8 +174,13 @@ namespace GestPR
             builder.Services.AddScoped<CoursChangeService>();
             builder.Services.AddScoped<AnomalyDetectionService>();
             builder.Services.AddScoped<AchatDatasetService>();
+            builder.Services.AddScoped<GestPR.Service.MachineLearning.IAchatDatasetService>(sp =>
+                sp.GetRequiredService<AchatDatasetService>());
             builder.Services.AddScoped<GestPR.Service.MachineLearning.ValidationDatasetService>();
+            builder.Services.AddScoped<GestPR.Service.MachineLearning.IValidationDatasetService>(sp =>
+                sp.GetRequiredService<GestPR.Service.MachineLearning.ValidationDatasetService>());
             builder.Services.AddScoped<GestPR.Service.MachineLearning.DelaiValidationService>();
+            builder.Services.AddScoped<GestPR.Service.Ocr.OcrService>();
 
             // ⬇️ Ligne manquante : sans elle, RenaissanceDto reste un objet vide (BaseUrl="")
             //    même si appsettings.json contient bien la section "RenaissanceApi".
