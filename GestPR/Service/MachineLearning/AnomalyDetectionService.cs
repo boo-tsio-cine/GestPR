@@ -1,231 +1,128 @@
 using GestPR.Dtos;
-using Microsoft.ML;
-using Microsoft.ML.Data;
+using GestPR.Service.Demandes;
+using GestPR.Service.MachineLearning;
+using Microsoft.Extensions.Caching.Memory;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
-namespace GestPR.Service.MachineLearning
+namespace GestPR.Service.Anomalies
 {
-    // Ligne d'entrée du modèle : uniquement les features numériques utilisées pour l'entraînement.
-    // Volontairement séparée de AchatDatasetRow (qui contient aussi les métadonnées ArticleId/Designation)
-    // car ML.NET travaille sur des colonnes de features propres, sans "bruit" métier.
-    public class AchatModelInput
+    public class AnomalyDetectionService : IAnomalyDetectionService
     {
-        public float LogPrixDeRevient { get; set; }
-        public float ZScoreDesignation { get; set; }
-        public float NbOccurrencesDesignation { get; set; }
-    }
+        // Ancienne heuristique (conservee pour comparaison dans le chapitre resultats du memoire)
+        private const decimal SEUIL_ALERTE_HEURISTIQUE_POURCENT = 20m;
 
-    // Sortie du modèle pour une ligne donnée
-    public class AchatAnomalyPrediction
-    {
-        [ColumnName("PredictedLabel")]
-        public bool EstAnomalie { get; set; }
+        // Seuil ML : a calibrer avec de vraies donnees une fois le dataset disponible
+        private const double SEUIL_ALERTE_ML = 0.65;
 
-        [ColumnName("Score")]
-        public float ScoreAnomalie { get; set; } // erreur de reconstruction PCA : plus c'est élevé, plus c'est anormal
-    }
+        // Doit rester coherent avec le seuil utilise par DatasetEntrainementService
+        private const int NB_MINIMUM_POUR_ML = 2;
 
-    // Ligne enrichie renvoyée à l'API : la prédiction + les métadonnées métier pour l'affichage
-    public class AchatAnomalieResultat
-    {
-        public int ArticleId { get; set; }
-        public string CodeLot { get; set; } = "";
-        public string Designation { get; set; } = "";
-        public decimal PrixDeRevient { get; set; }
-        public double ZScoreDesignation { get; set; }
-        public bool EstAnomalie { get; set; }
-        public float ScoreAnomalie { get; set; }
-        public bool IsLikelyTestData { get; set; }
-    }
+        private const string CACHE_KEY_DATASET = "ml_dataset_designations";
+        private static readonly TimeSpan DUREE_CACHE = TimeSpan.FromMinutes(15);
 
-    public class AnomalyDetectionService
-    {
-        private readonly IAchatDatasetService _datasetService;
-        private readonly MLContext _mlContext;
-        private readonly string _modelPath;
+        private readonly IDemandeService _demandeService;
+        private readonly IDatasetEntrainementService _datasetService;
+        private readonly IMemoryCache _cache;
 
-        public AnomalyDetectionService(IAchatDatasetService datasetService, IWebHostEnvironment env)
+        public AnomalyDetectionService(
+            IDemandeService demandeService,
+            IDatasetEntrainementService datasetService,
+            IMemoryCache cache)
         {
+            _demandeService = demandeService;
             _datasetService = datasetService;
-            _mlContext = new MLContext(seed: 1); // seed fixe : résultats reproductibles pour la démo
-
-            // Dossier persistant pour le modèle entraîné (créé si absent)
-            var modelsDir = Path.Combine(env.ContentRootPath, "MLModels");
-            Directory.CreateDirectory(modelsDir);
-            _modelPath = Path.Combine(modelsDir, "anomaly_model.zip");
+            _cache = cache;
         }
 
-        // Entraîne le modèle sur le dataset actuel et le sauvegarde sur disque.
-        // excludeTestData=true : n'entraîne que sur les données jugées réelles (recommandé),
-        // avec repli automatique sur tout le dataset si l'échantillon réel est trop petit.
-        public async Task<(int nbLignesUtilisees, bool aExcluDonneesTest, string modelPath)> TrainAndSaveAsync(bool excludeTestData = true)
+        public async Task<AnomalyResultDto> AnalyserPrixAsync(string designation, string? codeLot, decimal prixDeRevient)
         {
-            var dataset = await _datasetService.GetDatasetAsync();
+            // 1. Heuristique existante (ecart vs dernier prix connu)
+            var result = await CalculerHeuristiqueAsync(designation, prixDeRevient);
 
-            var donneesEntrainement = excludeTestData
-                ? dataset.Where(x => !x.IsLikelyTestData).ToList()
-                : dataset;
+            // 2. Score Isolation Forest (ML), quand assez d'historique valide est disponible
+            await CompleterAvecScoreMlAsync(result, designation, prixDeRevient);
 
-            bool aExclu = excludeTestData && donneesEntrainement.Count < dataset.Count;
-
-            // Repli : si trop peu de données réelles restent, on entraîne sur tout le dataset
-            // (mieux vaut un modèle imparfait que pas de modèle du tout, tant que le vrai volume grandit)
-            const int minimumLignesRequises = 4; // RandomizedPCA a besoin d'au moins quelques exemples
-            if (donneesEntrainement.Count < minimumLignesRequises)
-            {
-                donneesEntrainement = dataset;
-                aExclu = false;
-            }
-
-            if (donneesEntrainement.Count < minimumLignesRequises)
-            {
-                throw new InvalidOperationException(
-                    $"Pas assez de données pour entraîner un modèle (minimum {minimumLignesRequises}, disponible {donneesEntrainement.Count}).");
-            }
-
-            var inputs = donneesEntrainement.Select(x => new AchatModelInput
-            {
-                LogPrixDeRevient = (float)x.LogPrixDeRevient,
-                ZScoreDesignation = (float)x.ZScoreDesignation,
-                NbOccurrencesDesignation = x.NbOccurrencesDesignation
-            }).ToList();
-
-            IDataView trainingData = _mlContext.Data.LoadFromEnumerable(inputs);
-
-            var pipeline = _mlContext.Transforms
-                .Concatenate("Features", nameof(AchatModelInput.LogPrixDeRevient),
-                                          nameof(AchatModelInput.ZScoreDesignation),
-                                          nameof(AchatModelInput.NbOccurrencesDesignation))
-                // Normalisation indispensable : sans ça, LogPrixDeRevient (échelle ~10-17) écrase
-                // complètement ZScoreDesignation (échelle ~-1 à 1) dans le calcul du PCA.
-                .Append(_mlContext.Transforms.NormalizeMeanVariance("Features"))
-                .Append(_mlContext.AnomalyDetection.Trainers.RandomizedPca(featureColumnName: "Features", rank: 2));
-
-            var model = pipeline.Fit(trainingData);
-
-            _mlContext.Model.Save(model, trainingData.Schema, _modelPath);
-
-            return (donneesEntrainement.Count, aExclu, _modelPath);
+            return result;
         }
 
-        // Charge le modèle sauvegardé et score l'ensemble du dataset actuel (y compris les données de test, marquées comme telles)
-        public async Task<List<AchatAnomalieResultat>> DetectAsync()
+        private async Task<AnomalyResultDto> CalculerHeuristiqueAsync(string designation, decimal prixDeRevient)
         {
-            if (!File.Exists(_modelPath))
+            var brutHistorique = await _demandeService.GetHistoriqueByDesignationAsync(designation);
+
+            var historique = brutHistorique
+                .Cast<HistoriqueArticleDto>()
+                .Where(h => h.PrixDeRevient > 0)
+                .OrderByDescending(h => h.Date)
+                .ToList();
+
+            var result = new AnomalyResultDto
             {
-                throw new InvalidOperationException("Aucun modèle entraîné trouvé. Appelez /train d'abord.");
-            }
-
-            var dataset = await _datasetService.GetDatasetAsync();
-
-            ITransformer model = _mlContext.Model.Load(_modelPath, out _);
-            var predictionEngine = _mlContext.Model.CreatePredictionEngine<AchatModelInput, AchatAnomalyPrediction>(model);
-
-            var resultats = dataset.Select(x =>
-            {
-                var input = new AchatModelInput
-                {
-                    LogPrixDeRevient = (float)x.LogPrixDeRevient,
-                    ZScoreDesignation = (float)x.ZScoreDesignation,
-                    NbOccurrencesDesignation = x.NbOccurrencesDesignation
-                };
-
-                var prediction = predictionEngine.Predict(input);
-
-                return new AchatAnomalieResultat
-                {
-                    ArticleId = x.ArticleId,
-                    CodeLot = x.CodeLot,
-                    Designation = x.Designation,
-                    PrixDeRevient = x.PrixDeRevient,
-                    ZScoreDesignation = x.ZScoreDesignation,
-                    EstAnomalie = prediction.EstAnomalie,
-                    ScoreAnomalie = prediction.ScoreAnomalie,
-                    IsLikelyTestData = x.IsLikelyTestData
-                };
-            })
-            .OrderByDescending(x => x.ScoreAnomalie)
-            .ToList();
-
-            return resultats;
-        }
-
-        // Analyse une SEULE ligne d'achat (pas encore enregistrée en base) et retourne
-        // un verdict immédiat, en la comparant à l'historique existant de sa désignation.
-        public async Task<AnalysePrixResponseDto> AnalyserPrixAsync(string designation, string codeLot, decimal prixDeRevient, double seuilPourcentAlerte = 20)
-        {
-            if (!File.Exists(_modelPath))
-            {
-                throw new InvalidOperationException("Aucun modèle entraîné trouvé. Appelez /train d'abord.");
-            }
-
-            if (prixDeRevient <= 0)
-            {
-                throw new ArgumentException("Le prix de revient doit être supérieur à 0.");
-            }
-
-            var stats = await _datasetService.GetStatsDesignationAsync(designation);
-            var (dateDernier, dernierPrix) = await _datasetService.GetDernierPrixDesignationAsync(designation);
-
-            double prixDouble = (double)prixDeRevient;
-            double logPrix = Math.Log(prixDouble + 1);
-
-            double zScore = stats.EcartType > 0
-                ? (prixDouble - stats.Moyenne) / stats.EcartType
-                : 0;
-
-            var input = new AchatModelInput
-            {
-                LogPrixDeRevient = (float)logPrix,
-                ZScoreDesignation = (float)zScore,
-                NbOccurrencesDesignation = stats.Count
+                NbOccurrencesHistorique = historique.Count
             };
 
-            ITransformer model = _mlContext.Model.Load(_modelPath, out _);
-            var predictionEngine = _mlContext.Model.CreatePredictionEngine<AchatModelInput, AchatAnomalyPrediction>(model);
-            var prediction = predictionEngine.Predict(input);
-            bool estAnomalieML = stats.Count > 0 && prediction.EstAnomalie;
-
-            // Comparaison directe au dernier prix connu — le critère principal et transparent,
-            // celui qu'on met en avant auprès des utilisateurs métier.
-            double? ecartPourcent = null;
-            bool alerteEcartRecent = false;
-            if (dernierPrix.HasValue && dernierPrix.Value > 0)
+            if (historique.Count == 0)
             {
-                ecartPourcent = Math.Round(((double)(prixDeRevient - dernierPrix.Value) / (double)dernierPrix.Value) * 100, 2);
-                alerteEcartRecent = Math.Abs(ecartPourcent.Value) > seuilPourcentAlerte;
+                result.Message = $"Aucun historique trouvé pour « {designation} ». Ce sera le premier prix enregistré pour cet article.";
+                return result;
             }
 
-            string message;
-            if (stats.Count == 0)
+            var dernier = historique.First();
+            var moyenne = historique.Average(h => h.PrixDeRevient);
+
+            result.DernierPrixConnu = dernier.PrixDeRevient;
+            result.DateDernierPrix = dernier.Date;
+            result.PrixMoyenHistorique = Math.Round(moyenne, 2);
+
+            var ecartPourcent = dernier.PrixDeRevient == 0
+                ? 0
+                : Math.Round(((prixDeRevient - dernier.PrixDeRevient) / dernier.PrixDeRevient) * 100m, 2);
+
+            result.EcartVsDernierPrixPourcent = ecartPourcent;
+            result.AlerteEcartRecent = Math.Abs(ecartPourcent) >= SEUIL_ALERTE_HEURISTIQUE_POURCENT;
+
+            return result;
+        }
+
+        private async Task CompleterAvecScoreMlAsync(AnomalyResultDto result, string designation, decimal prixDeRevient)
+        {
+            var dataset = await ObtenirDatasetEnCacheAsync();
+
+            var groupe = dataset.FirstOrDefault(d =>
+                string.Equals(d.Designation, designation.Trim(), StringComparison.OrdinalIgnoreCase));
+
+            if (groupe == null)
             {
-                message = "Aucun historique pour cette désignation : impossible de comparer, prudence recommandée.";
-            }
-            else if (alerteEcartRecent)
-            {
-                message = $"⚠️ Ce prix diffère de {ecartPourcent:+0.##;-0.##}% par rapport au dernier prix enregistré " +
-                           $"({dernierPrix:N0} Ar, saisi le {dateDernier:dd/MM/yyyy}).";
-            }
-            else
-            {
-                message = $"Prix cohérent avec le dernier enregistré ({dernierPrix:N0} Ar du {dateDernier:dd/MM/yyyy}), écart de {ecartPourcent:+0.##;-0.##}%.";
+                // Designation absente du dataset d'entrainement (< NB_MINIMUM_POUR_ML prix valides)
+                // -> pas de score ML calcule, le badge front n'affichera rien de ce cote.
+                result.Message = string.IsNullOrEmpty(result.Message)
+                    ? $"Historique insuffisant pour une analyse ML (moins de {NB_MINIMUM_POUR_ML} prix validés). Consultez l'historique manuel."
+                    : result.Message;
+                return;
             }
 
-            return new AnalysePrixResponseDto
-            {
-                Designation = designation,
-                CodeLot = codeLot,
-                PrixDeRevient = prixDeRevient,
-                NbOccurrencesHistorique = stats.Count,
-                MoyenneHistorique = Math.Round(stats.Moyenne, 4),
-                ZScoreDesignation = Math.Round(zScore, 4),
-                ScoreAnomalie = prediction.ScoreAnomalie,
-                EstAnomalie = estAnomalieML,
-                DernierPrixConnu = dernierPrix,
-                DateDernierPrix = dateDernier,
-                EcartVsDernierPrixPourcent = ecartPourcent,
-                AlerteEcartRecent = alerteEcartRecent,
-                Message = message
-            };
+            var valeurs = groupe.Prix.Select(p => (double)p.PrixDeRevient).ToList();
+            var forest = new IsolationForest(valeurs);
+            var score = forest.ScoreAnomalie((double)prixDeRevient);
+
+            result.ScoreAnomalieMl = Math.Round(score, 4);
+            result.AlerteAnomalieMl = score >= SEUIL_ALERTE_ML;
+
+            result.Message = result.AlerteAnomalieMl
+                ? $"Le modèle ML détecte ce prix comme atypique (score {result.ScoreAnomalieMl:P0}) par rapport à {groupe.Prix.Count} prix validés historiques."
+                : $"Prix cohérent avec l'historique selon le modèle ML (score {result.ScoreAnomalieMl:P0}) sur {groupe.Prix.Count} prix validés.";
+        }
+
+        private async Task<List<DesignationDataset>> ObtenirDatasetEnCacheAsync()
+        {
+            if (_cache.TryGetValue(CACHE_KEY_DATASET, out List<DesignationDataset>? dataset) && dataset != null)
+                return dataset;
+
+            dataset = await _datasetService.ExtraireDatasetAsync(NB_MINIMUM_POUR_ML);
+            _cache.Set(CACHE_KEY_DATASET, dataset, DUREE_CACHE);
+            return dataset;
         }
     }
 }

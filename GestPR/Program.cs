@@ -6,6 +6,7 @@ using GestPR.Repository;
 using GestPR.Repository.Demandes;
 using GestPR.Repository.Taux_Historic;
 using GestPR.Service;
+using GestPR.Service.Anomalies;
 using GestPR.Service.Audit;
 using GestPR.Service.Demandes;
 using GestPR.Service.Email;
@@ -181,7 +182,10 @@ namespace GestPR
                 sp.GetRequiredService<GestPR.Service.MachineLearning.ValidationDatasetService>());
             builder.Services.AddScoped<GestPR.Service.MachineLearning.DelaiValidationService>();
             builder.Services.AddScoped<GestPR.Service.Ocr.OcrService>();
-
+            builder.Services.AddMemoryCache();
+            builder.Services.AddScoped<IDatasetEntrainementService, DatasetEntrainementService>();
+            builder.Services.AddScoped<IAnomalyDetectionService, AnomalyDetectionService>();
+            builder.Services.AddScoped<IEvaluationService, EvaluationService>();
             // ⬇️ Ligne manquante : sans elle, RenaissanceDto reste un objet vide (BaseUrl="")
             //    même si appsettings.json contient bien la section "RenaissanceApi".
             builder.Services.Configure<GestPR.Dtos.RenaissanceDto>(

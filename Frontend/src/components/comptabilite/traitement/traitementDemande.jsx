@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { demandeService, frsService, userService, coursChangeService, anomalyService } from "../../../services/api";
+import api, { demandeService, frsService, userService, coursChangeService, anomalyService } from "../../../services/api";
 import { toast } from "sonner";
 import Nav from "../../nav/nav";
 import "./traitement.css";
@@ -492,6 +492,58 @@ export function TraitementDemande(){
         fetchFrs();
     }, []);
 
+    // Fonction de téléversement et parsing automatique du fichier Excel
+   // SIMULATION : Import Excel avec mock de données
+    const handleExcelImport = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append("fichier", file);
+
+        try {
+            toast.info("Analyse du fichier Excel en cours...");
+
+            const res = await api.post("/ocr/analyser-excel", formData, {
+                headers: {
+                    "Content-Type": "multipart/form-data",
+                },
+            });
+
+            console.log("Données Excel analysées :", res.data);
+
+            // Extraction de la payload (gestion de la structure ApiResponse ou directe)
+            const data = res.data?.data ?? res.data;
+
+            if (data) {
+                setDossierData((prev) => ({
+                    ...prev,
+                    cours: (data.cours ?? data.Cours)?.toString() ?? prev.cours,
+                    tc: (data.tc ?? data.Tc)?.toString() ?? prev.tc,
+                    fobTotal: (data.fobTotal ?? data.FobTotal)?.toString() ?? prev.fobTotal,
+                    mfobTotal: (data.mfobTotal ?? data.MfobTotal)?.toString() ?? prev.mfobTotal,
+                    fretTotal: (data.fretTotal ?? data.FretTotal)?.toString() ?? prev.fretTotal,
+                    // deboursTransit contient désormais le cumul (Débours + Rémunération Transit) calculé par le backend
+                    deboursTransit: (data.deboursTransit ?? data.DeboursTransit)?.toString() ?? prev.deboursTransit,
+                    transportLocal: (data.transportLocal ?? data.TransportLocal)?.toString() ?? prev.transportLocal,
+                    commissionRemun: (data.commissionRemun ?? data.CommissionRemun)?.toString() ?? prev.commissionRemun,
+                    douanes: (data.douanes ?? data.Douanes)?.toString() ?? prev.douanes,
+                    prestationGasyNet: (data.prestationGasyNet ?? data.PrestationGasyNet)?.toString() ?? prev.prestationGasyNet,
+                    apmf: (data.apmf ?? data.Apmf)?.toString() ?? prev.apmf,
+                    autresDat: (data.autresDat ?? data.AutresDat)?.toString() ?? prev.autresDat,
+                }));
+
+                toast.success("Données Excel importées et formulaires remplis !");
+            }
+        } catch (err) {
+            console.error("Erreur lors de l'import Excel :", err);
+            toast.error("Erreur lors du traitement du fichier Excel.");
+        } finally {
+            // Permet de pouvoir réimporter le même fichier sans bloquer le onChange
+            e.target.value = "";
+        }
+    };
+
     // ─────────────────────────────────────────────────────────────────────────
     // RENDER CONDITIONNEL RESTRUCTURÉ (Correction de l'écran blanc)
     // ─────────────────────────────────────────────────────────────────────────
@@ -586,7 +638,17 @@ export function TraitementDemande(){
                         <p><strong>Matricule :</strong> {demandes.matricule}</p>
                         <p><strong>Site :</strong> {demandes.site || "Non défini"}</p>
                     </div>
-
+                    <div className="d-flex align-items-center gap-2 mb-3">
+                        <label className="btn btn-outline-success btn-sm mb-0">
+                            📊 Importer le fichier Excel de calcul
+                            <input 
+                                type="file" 
+                                accept=".xlsx, .xls" 
+                                onChange={handleExcelImport} 
+                                style={{ display: "none" }} 
+                            />
+                        </label>
+                    </div>
                     <form onSubmit={handleSubmit} method="post">
                          <div className=" card mt-1 p-4">
                              <div className="row g-3">
@@ -906,16 +968,28 @@ export function TraitementDemande(){
                                                                     <span className="badge bg-secondary" title={alertesAnomalies[rowKey].message}>
                                                                         Pas d'historique
                                                                     </span>
-                                                                ) : alertesAnomalies[rowKey].alerteEcartRecent ? (
-                                                                    <span className="badge bg-danger" title={alertesAnomalies[rowKey].message}>
-                                                                        ⚠️ {alertesAnomalies[rowKey].ecartVsDernierPrixPourcent > 0 ? "+" : ""}
-                                                                        {alertesAnomalies[rowKey].ecartVsDernierPrixPourcent}% vs dernier prix
-                                                                    </span>
+                                                                ) : alertesAnomalies[rowKey].scoreAnomalieMl !== null && alertesAnomalies[rowKey].scoreAnomalieMl !== undefined ? (
+                                                                    alertesAnomalies[rowKey].alerteAnomalieMl ? (
+                                                                        <span className="badge bg-danger" title={alertesAnomalies[rowKey].message}>
+                                                                            ⚠️ ML : {Math.round(alertesAnomalies[rowKey].scoreAnomalieMl * 100)}% de risque
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="badge bg-success" title={alertesAnomalies[rowKey].message}>
+                                                                            ✓ ML : {Math.round(alertesAnomalies[rowKey].scoreAnomalieMl * 100)}% de risque
+                                                                        </span>
+                                                                    )
                                                                 ) : (
-                                                                    <span className="badge bg-success" title={alertesAnomalies[rowKey].message}>
-                                                                        ✓ {alertesAnomalies[rowKey].ecartVsDernierPrixPourcent > 0 ? "+" : ""}
-                                                                        {alertesAnomalies[rowKey].ecartVsDernierPrixPourcent}% vs dernier prix
-                                                                    </span>
+                                                                    alertesAnomalies[rowKey].alerteEcartRecent ? (
+                                                                        <span className="badge bg-warning text-dark" title={alertesAnomalies[rowKey].message}>
+                                                                            ⚠️ {alertesAnomalies[rowKey].ecartVsDernierPrixPourcent > 0 ? "+" : ""}
+                                                                            {alertesAnomalies[rowKey].ecartVsDernierPrixPourcent}% vs dernier prix (estimation)
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="badge bg-light text-dark border" title={alertesAnomalies[rowKey].message}>
+                                                                            ✓ {alertesAnomalies[rowKey].ecartVsDernierPrixPourcent > 0 ? "+" : ""}
+                                                                            {alertesAnomalies[rowKey].ecartVsDernierPrixPourcent}% vs dernier prix (estimation)
+                                                                        </span>
+                                                                    )
                                                                 )}
                                                             </div>
                                                         )}

@@ -45,7 +45,7 @@ namespace GestPR.Service.MachineLearning
             // On ne garde que les demandes VALIDEES : un dossier encore en cours de traitement
             // n'est pas une reference de prix fiable pour entrainer le modele.
             var demandesValidees = await _context.Demande
-                .Where(d => d.Status == "Validé")
+                .Where(d => d.Status == "Validée")
                 .Include(d => d.Articles)
                 .ToListAsync();
 
