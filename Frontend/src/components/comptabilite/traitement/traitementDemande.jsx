@@ -6,6 +6,7 @@ import Nav from "../../nav/nav";
 import "./traitement.css";
 import PageApercuDemande from "./PageApercuDemande";
 import paysData from '../../../data/pays.json';
+import { construireResumeMachine } from "../../../utils/resumeMachine";
 
 const taux_assurance = 0.2;
 
@@ -544,6 +545,13 @@ export function TraitementDemande(){
         }
     };
 
+    // Calcul du résumé machine (placé avant les returns anticipés pour respecter les Rules of Hooks)
+    const resumeMachine = useMemo(() => construireResumeMachine({
+        dossierData, valeurCAF, detailFraisApproche,
+        fraisApprocheTotal: fraisApprocheTotalCalcule,
+        lignes, saisies, resultatsParArticle, idDemande: id,
+    }), [dossierData, valeurCAF, detailFraisApproche, fraisApprocheTotalCalcule, lignes, saisies, resultatsParArticle, id]);
+
     // ─────────────────────────────────────────────────────────────────────────
     // RENDER CONDITIONNEL RESTRUCTURÉ (Correction de l'écran blanc)
     // ─────────────────────────────────────────────────────────────────────────
@@ -582,8 +590,9 @@ export function TraitementDemande(){
                     nomDemandeur: demandes.nomDemandeur,
                     prenomDemandeur: demandes.prenomDemandeur,
                     matricule: demandes.matricule,
-                    commentaire: commentaire,
+                     commentaire: commentaire,
                     tauxAssurance: taux_assurance,
+                    resumeMachine: resumeMachine,
                 }}
             />
         );
@@ -611,7 +620,7 @@ export function TraitementDemande(){
                 </div>
             </>
         );
-    }
+    };  
 
     // 4️⃣ Rendu principal (Formulaire)
     return (
@@ -962,14 +971,15 @@ export function TraitementDemande(){
                                                     <td className="text-end">{fmt(r.montant)}</td>
                                                     <td className="text-end">
                                                         <strong>{fmt(r.puAriary)} Ar</strong>
-                                                        {alertesAnomalies[rowKey] && (
-                                                            <div className="mt-1">
+                                                         {alertesAnomalies[rowKey] && (
+                                                            <div className="mt-1 d-flex align-items-center gap-1 flex-wrap">
                                                                 {alertesAnomalies[rowKey].nbOccurrencesHistorique === 0 ? (
                                                                     <span className="badge bg-secondary" title={alertesAnomalies[rowKey].message}>
                                                                         Pas d'historique
                                                                     </span>
                                                                 ) : alertesAnomalies[rowKey].scoreAnomalieMl !== null && alertesAnomalies[rowKey].scoreAnomalieMl !== undefined ? (
                                                                     alertesAnomalies[rowKey].alerteAnomalieMl ? (
+                                                                        /* BOUTON / BADGE EN CAS D'ANOMALIE ML */
                                                                         <span className="badge bg-danger" title={alertesAnomalies[rowKey].message}>
                                                                             ⚠️ ML : {Math.round(alertesAnomalies[rowKey].scoreAnomalieMl * 100)}% de risque
                                                                         </span>
@@ -980,15 +990,41 @@ export function TraitementDemande(){
                                                                     )
                                                                 ) : (
                                                                     alertesAnomalies[rowKey].alerteEcartRecent ? (
-                                                                        <span className="badge bg-warning text-dark" title={alertesAnomalies[rowKey].message}>
-                                                                            ⚠️ {alertesAnomalies[rowKey].ecartVsDernierPrixPourcent > 0 ? "+" : ""}
-                                                                            {alertesAnomalies[rowKey].ecartVsDernierPrixPourcent}% vs dernier prix (estimation)
-                                                                        </span>
+                                                                        <>
+                                                                            <span className="badge bg-warning text-dark" title={alertesAnomalies[rowKey].message}>
+                                                                                ⚠️ {alertesAnomalies[rowKey].ecartVsDernierPrixPourcent > 0 ? "+" : ""}
+                                                                                {alertesAnomalies[rowKey].ecartVsDernierPrixPourcent}% vs dernier prix (estimation)
+                                                                            </span>
+                                                                            <button
+                                                                                type="button"
+                                                                                className="btn btn-sm btn-info text-white"
+                                                                                onClick={() => navigate(
+                                                                                        `/detection-anomalie/${encodeURIComponent(lot.designation)}`,
+                                                                                        { state: { nouveauTraitement: resumeMachine } }
+                                                                                    )}
+                                                                                title="Voir la détection d'anomalie"
+                                                                            >
+                                                                                🔍 Détection
+                                                                            </button>
+                                                                        </>
                                                                     ) : (
-                                                                        <span className="badge bg-light text-dark border" title={alertesAnomalies[rowKey].message}>
-                                                                            ✓ {alertesAnomalies[rowKey].ecartVsDernierPrixPourcent > 0 ? "+" : ""}
-                                                                            {alertesAnomalies[rowKey].ecartVsDernierPrixPourcent}% vs dernier prix (estimation)
-                                                                        </span>
+                                                                        <>
+                                                                            <span className="badge bg-light text-dark border" title={alertesAnomalies[rowKey].message}>
+                                                                                ✓ {alertesAnomalies[rowKey].ecartVsDernierPrixPourcent > 0 ? "+" : ""}
+                                                                                {alertesAnomalies[rowKey].ecartVsDernierPrixPourcent}% vs dernier prix (estimation)
+                                                                            </span>
+                                                                            <button
+                                                                                type="button"
+                                                                                className="btn btn-sm btn-info text-white"
+                                                                                onClick={() => navigate(
+                                                                                    `/detection-anomalie/${encodeURIComponent(lot.designation)}`,
+                                                                                    { state: { nouveauTraitement: resumeMachine } }
+                                                                                )}
+                                                                                title="Voir la détection d'anomalie"
+                                                                            >
+                                                                                🔍 Détection
+                                                                            </button>
+                                                                        </>
                                                                     )
                                                                 )}
                                                             </div>

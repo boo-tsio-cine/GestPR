@@ -1,0 +1,54 @@
+.detection-anomalie-page {
+    min-height: 100vh;
+    background-color: #f8f9fa;
+}
+
+.detection-anomalie-container {
+    max-width: 1200px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+}
+
+.detection-anomalie-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding: 1rem 1.25rem;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.detection-anomalie-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    color: #111827;
+}
+
+.designation-badge {
+    display: inline-block;
+    padding: 0.35rem 0.75rem;
+    background-color: #dbeafe;
+    color: #1e40af;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    flex: 1;
+    text-align: center;
+}
+
+.modal-sm {
+    max-width: 500px;
+}
+
+@media (max-width: 768px) {
+    .detection-anomalie-header {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .designation-badge {
+        width: 100%;
+    }
+}

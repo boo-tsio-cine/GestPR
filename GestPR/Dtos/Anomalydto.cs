@@ -38,4 +38,23 @@ namespace GestPR.Dtos
         // Message lisible affiché en tooltip du badge (title=...)
         public string Message { get; set; } = "";
     }
+
+    public class AnomalyContextDto
+    {
+        public bool IsAnomaly { get; set; }
+        public double AnomalyScore { get; set; }
+        public string ItemDesignation { get; set; }
+        public decimal CurrentPrice { get; set; }
+
+        // Les données récupérées sur les articles les plus proches
+        public List<SimilarItemDto> SimilarHistoricalItems { get; set; }
+    }
+
+    public class SimilarItemDto
+    {
+        public string ReferenceNumber { get; set; }
+        public decimal UnitPrice { get; set; }
+        public DateTime DateValidee { get; set; }
+        public string VendorOrComment { get; set; }
+    }
 }

@@ -165,6 +165,7 @@ export const demandeService = {
   updateStatus: (id, status, motif) => api.put(`/demandes/${id}/status`, { status, motif }),
 
   getAuditLogs: (id)=> api.get(`/demandes/${id}/audit`),
+  getPdf: (id) => api.get(`/demandes/${id}/pdf`, { responseType: "blob" }),
 };
 
 export const articleService = {

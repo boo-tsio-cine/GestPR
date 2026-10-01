@@ -144,6 +144,17 @@
     border-collapse: collapse; 
     font-size: 12px; 
     margin-top: 10px; 
+    page-break-inside: avoid; 
+    break-inside: avoid; 
+}
+
+.table-articles thead {
+    display: table-header-group;
+}
+
+.table-articles tbody {
+    page-break-inside: avoid;
+    break-inside: avoid;
 }
 
 .table-articles th { background-color: #343a40; color: white; padding: 8px; font-weight: 600; text-align: left; }

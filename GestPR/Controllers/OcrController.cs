@@ -39,7 +39,7 @@ namespace GestPR.Controllers
             try
             {
                 using var stream = fichier.OpenReadStream();
-                var texte = await _ocrService.ExtraireTexteAsync(stream, fichier.FileName);
+                var texte = await _ocrService.ExtraireTexteAsync (stream, fichier.FileName);
 
                 return Ok(ApiResponse<object>.Ok(new
                 {
@@ -111,6 +111,10 @@ namespace GestPR.Controllers
                     {
                         remunTransitVal = GetDecimalVal(worksheet.Cell(row, 2)) ?? 0;
                     }
+                    else if (keyCell.Contains("DEBOURS S/MAGASINAGE"))
+                    {
+                        result.DeboursMagasinage = GetDecimalVal(worksheet.Cell(row, 2)) ?? 0;
+                    }
                     else if (keyCell.Contains("TRANSPORT LOCAL"))
                     {
                         result.TransportLocal = GetDecimalVal(worksheet.Cell(row, 3));
@@ -119,6 +123,11 @@ namespace GestPR.Controllers
                     {
                         var val = GetDecimalVal(worksheet.Cell(row, 4));
                         result.CommissionRemun = val.HasValue ? val.Value * 100 : null;
+                    }
+                    else if (keyCell.Contains("COMMISSION REMUN"))
+                    {
+                        var val = GetDecimalVal(worksheet.Cell(row, 4));
+                        result.CommissionBancaire = val.HasValue ? val.Value * 100 : null;
                     }
                     else if (keyCell.Contains("DOUANES"))
                     {

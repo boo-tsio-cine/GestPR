@@ -7,6 +7,22 @@ import "./PageApercuDemande.css";
 
 const taux_assurance = 0.2;
 
+// Genere le PDF exactement comme avant (meme rendu visuel, meme pagination),
+// puis ajoute une ligne de texte invisible mais reellement extractible,
+// contenant le resume structure ci-dessus.
+async function genererPdfAvecCoucheTexte(element, options, donneesResume) {
+    const pdf = await html2pdf().from(element).set(options).toPdf().get('pdf');
+
+    const resumeTexte = `__GESTPR_DATA__${JSON.stringify(donneesResume)}__FIN_GESTPR_DATA__`;
+    const totalPages = pdf.internal.getNumberOfPages();
+    pdf.setPage(totalPages);
+    pdf.setFontSize(1);
+    pdf.setTextColor(255, 255, 255); // blanc sur fond blanc = invisible à l'œil, mais texte bien réel
+    pdf.text(resumeTexte, 2, pdf.internal.pageSize.getHeight() - 2);
+
+    return pdf;
+}
+
 function calcMontant(prixUnitaire, quantite) {
     const pu = parseFloat(prixUnitaire) || 0;
     const qte = parseFloat(quantite) || 0;
@@ -242,7 +258,11 @@ export default function PageApercuDemande({idDemande, userRole = "Demandeur", on
             };
 
             // 2. Extraire le PDF sous forme de fichier binaire brut (Blob)
-            const pdfBlob = await html2pdf().from(element).set(options).output('blob');
+            // const pdfBlob = await html2pdf().from(element).set(options).output('blob');
+
+            const donneesResume = donneesInitiales?.resumeMachine || {};
+            const pdf = await genererPdfAvecCoucheTexte(element, options, donneesResume);
+            const pdfBlob = pdf.output('blob');
 
             // 3. Préparer le tableau des prix de revient (PU Ariary) calculés en temps réel
             // On extrait les valeurs de resultatsParArticle (qui contient puAriary pour chaque article)
@@ -342,7 +362,15 @@ export default function PageApercuDemande({idDemande, userRole = "Demandeur", on
         ? fretValueAvecAutreFrais + droitEtTaxesValue + fraisArriveeValue + commissionValueDF + assuranceValue + tarifLTAValue
         : fretValue + droitEtTaxesValue + debarquementValueNonAerien + commissionValueDF + livraisonValue + assuranceValue + tarifLTAValue;
 // + droitEtTaxesValue + commissionValueDF + transportLocalDF + assuranceValue
-    const couttot = fraisapproche + (parseFloat(dossierData?.fobTotal))
+    const couttot = fraisapproche + (parseFloat(dossierData?.fobTotal));
+
+
+    // const response = await api.post("/Anomalie/expliquer", {
+    //     demandeIdReference: art.demandeId,
+    //     nouveauTraitement: construireResumeMachine(dossierData, resultatsParArticle, idDemande)
+    // });
+    // setSelectedArticle({ ...art, explication: response.data.data.explication, comparaison: response.data.data.comparaison });
+
 
     return (
         <div className="pdf-preview-background">
@@ -562,7 +590,7 @@ export default function PageApercuDemande({idDemande, userRole = "Demandeur", on
                         )}
                         <tr>
                             <td>16</td>
-                            <td>Commission SACORFINA</td>
+                            <td>Commission SACOFRINA</td>
                             <td className="text-end">{fmt(parseFloat(detailFraisApproche?.commissionRemunTranslate || 0)/dossierData.cours)} </td>
                             <td className="text-end">{fmt(detailFraisApproche?.pourcentcommissionRemun || 0)} %</td>
                         </tr>

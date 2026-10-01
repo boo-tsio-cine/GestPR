@@ -188,6 +188,10 @@ namespace GestPR
             builder.Services.AddScoped<IEvaluationService, EvaluationService>();
             // ⬇️ Ligne manquante : sans elle, RenaissanceDto reste un objet vide (BaseUrl="")
             //    même si appsettings.json contient bien la section "RenaissanceApi".
+
+            builder.Services.AddScoped<IDossierPdfParserService, DossierPdfParserService>();
+            builder.Services.AddScoped<IComparateurDossierService, ComparateurDossierService>();
+            builder.Services.AddHttpClient<ILlmExplicateurService, LlmExplicateurService>();
             builder.Services.Configure<GestPR.Dtos.RenaissanceDto>(
                 builder.Configuration.GetSection("RenaissanceApi"));
 

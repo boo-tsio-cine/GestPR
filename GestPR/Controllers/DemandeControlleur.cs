@@ -182,7 +182,12 @@ namespace GestPR.Controllers
             if (demande == null || string.IsNullOrEmpty(demande.PdfFileName))
                 return NotFound("Fichier non trouvé");
 
-            return Redirect($"/uploads/pdfs/{demande.PdfFileName}");
+            var chemin = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "pdfs", demande.PdfFileName);
+
+            if (!System.IO.File.Exists(chemin))
+                return NotFound("Fichier PDF introuvable sur le serveur.");
+
+            return PhysicalFile(chemin, "application/pdf");
         }
 
         [HttpGet("historique/{designation}")]

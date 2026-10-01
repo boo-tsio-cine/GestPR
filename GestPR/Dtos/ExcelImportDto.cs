@@ -8,8 +8,10 @@
         public decimal? MfobTotal { get; set; }
         public decimal? FretTotal { get; set; }
         public decimal? DeboursTransit { get; set; }
+        public decimal? DeboursMagasinage { get; set; }
         public decimal? TransportLocal { get; set; }
         public decimal? CommissionRemun { get; set; }
+        public decimal? CommissionBancaire { get; set; }
         public decimal? Douanes { get; set; }
         public decimal? PrestationGasyNet { get; set; }
         public decimal? Apmf { get; set; }
