@@ -7,6 +7,7 @@ import "./traitement.css";
 import PageApercuDemande from "./PageApercuDemande";
 import paysData from '../../../data/pays.json';
 import { construireResumeMachine } from "../../../utils/resumeMachine";
+import axios from "axios";
 
 const taux_assurance = 0.2;
 
@@ -1124,6 +1125,101 @@ export function TraitementDemande(){
                     </div>
                 </div>
             )}
+
+
+
+            
         </>
     );
 }
+
+
+
+const SimulateurPrixRevient = () => {
+  const [devise, setDevise] = useState(100); // 100 EUR / USD
+  const [taux, setTaux] = useState(4800); // 4800 Ar
+  const [frais, setFrais] = useState(500000); // Total frais (fret, transit)
+  const [douane, setDouane] = useState(200000);
+  const [resultats, setResultats] = useState(null);
+
+  const executerSimulation = async () => {
+    try {
+      const payload = {
+        montantFobDevise: parseFloat(devise),
+        tauxChange: parseFloat(taux),
+        totalFrais: parseFloat(frais),
+        droitsDouane: parseFloat(douane),
+        articles: [
+          { designation: 'Article A (Pompe)', montantFobDevise: 60, quantite: 2 },
+          { designation: 'Article B (Filtre)', montantFobDevise: 40, quantite: 5 }
+        ]
+      };
+
+      const response = await axios.post('http://localhost:5000/api/calcul/simulateur', payload);
+      setResultats(response.data);
+    } catch (error) {
+      console.error("Erreur lors du calcul :", error);
+    }
+  };
+
+  return (
+    <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
+      <h2>Simulateur du Prix de Revient (GestPR)</h2>
+      
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '15px' }}>
+        <label>
+          Montant FOB (Devise) :
+          <input type="number" value={devise} onChange={(e) => setDevise(e.target.value)} />
+        </label>
+        <label>
+          Taux de Change (Ar) :
+          <input type="number" value={taux} onChange={(e) => setTaux(e.target.value)} />
+        </label>
+        <label>
+          Total Frais Proratisés (Ar) :
+          <input type="number" value={frais} onChange={(e) => setFrais(e.target.value)} />
+        </label>
+        <label>
+          Droits de Douane (Ar) :
+          <input type="number" value={douane} onChange={(e) => setDouane(e.target.value)} />
+        </label>
+      </div>
+
+      <button onClick={executerSimulation} style={{ padding: '10px 20px', cursor: 'pointer', backgroundColor: '#007bff', color: '#fff', border: 'none', borderRadius: '4px' }}>
+        Lancer le Calcul Métier
+      </button>
+
+      {resultats && (
+        <div style={{ marginTop: '20px', borderTop: '2px solid #ccc', paddingTop: '10px' }}>
+          <h3>Résultats du Calcul en Ariary</h3>
+          <p><strong>Total FOB (Ariary) :</strong> {resultats.fobAriaryTotal.toLocaleString()} Ar</p>
+          
+          <table border="1" cellPadding="8" style={{ borderCollapse: 'collapse', width: '100%' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#f2f2f2' }}>
+                <th>Désignation</th>
+                <th>Qté</th>
+                <th>Frais Proratisés</th>
+                <th>Prix de Revient Unitaire</th>
+              </tr>
+            </thead>
+            <tbody>
+              {resultats.articles.map((art, index) => (
+                <tr key={index}>
+                  <td>{art.designation}</td>
+                  <td>{art.quantite}</td>
+                  <td>{art.fraisProratises.toLocaleString()} Ar</td>
+                  <td style={{ fontWeight: 'bold', color: '#28a745' }}>
+                    {art.prixDeRevientUnitaire.toLocaleString()} Ar
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default SimulateurPrixRevient;

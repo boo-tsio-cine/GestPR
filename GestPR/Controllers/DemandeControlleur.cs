@@ -1,12 +1,14 @@
-﻿using GestPR.Dtos;
+using GestPR.Dtos;
 using GestPR.Models;
 using GestPR.Service;
 using GestPR.Service.Audit;
 using GestPR.Service.Demandes;
+using GestPR.Service.MachineLearning;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -19,11 +21,13 @@ namespace GestPR.Controllers
     {
         private readonly IDemandeService _service;
         private readonly IAuditService _auditService;
+        private readonly IEstimationDelaiService _estimationDelaiService;
 
-        public DemandeController(IDemandeService service, IAuditService auditService)
+        public DemandeController(IDemandeService service, IAuditService auditService, IEstimationDelaiService estimationDelaiService)
         {
             _service = service;
             _auditService = auditService;
+            _estimationDelaiService = estimationDelaiService;
         }
 
         [HttpGet]
@@ -40,7 +44,7 @@ namespace GestPR.Controllers
             {
                 var demande = await _service.GetByIdAsync(id);
 
-                if(demande == null)
+                if (demande == null)
                 {
                     return NotFound(ApiResponse<object>.Fail($"La demande avec l'ID {id} n'existe pas."));
                 }
@@ -64,33 +68,6 @@ namespace GestPR.Controllers
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] DemandeAvecArticleCreateDto dto)
         {
-            //try
-            //{
-            //    var created = await _service.CreateAvecArticlesAsync(dto);
-
-            //    // AUDIT MONGODB (Sécurisé)
-            //    try
-            //    {
-            //        await _auditService.LogActionAsync(
-            //            entityName: "Demande",
-            //            demandeId: created.Id,
-            //            utilisateurId: dto.DemandeurId,
-            //            action: "Création",
-            //            nouveauStatut: "Nouvelle"
-            //        );
-            //    }
-            //    catch (Exception auditEx)
-            //    {
-            //        Console.WriteLine($"[AUDIT MONGODB WARNING] {auditEx.Message}");
-            //    }
-
-            //    return Ok(created);
-            //}
-            //catch (ArgumentException ex)
-            //{
-            //    return BadRequest(new { message = ex.Message });
-            //}
-
             var result = await _service.CreateAvecArticlesAsync(dto);
             return Ok(ApiResponse<DemandeAvecArticleResponseDto>.Ok(result, "Demande créée avec succès"));
         }
@@ -145,13 +122,16 @@ namespace GestPR.Controllers
         [HttpPut("{id}/status")]
         public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateStatusDto dto)
         {
-            var success = await _service.UpdateStatusAsync(id, dto.Status, dto.Motif);
-            if (!success) return NotFound(new { message = "Demande introuvable." });
-
+            // 🕒 On extrait l'identite du validateur AVANT d'appeler le service,
+            // car elle doit desormais etre enregistree en base (ValidateurId sur Demande)
+            // pour le dataset d'entrainement du delai de validation.
             string matriculeClaim = User.FindFirst("matricule")?.Value
                 ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value
                 ?? "0";
             int.TryParse(matriculeClaim, out int userId);
+
+            var success = await _service.UpdateStatusAsync(id, dto.Status, dto.Motif, userId);
+            if (!success) return NotFound(new { message = "Demande introuvable." });
 
             // AUDIT MONGODB : Utilisation de la même signature de méthode
             try
@@ -202,6 +182,33 @@ namespace GestPR.Controllers
         {
             var logs = await _service.GetAuditLogsAsync(id);
             return Ok(ApiResponse<IEnumerable<AuditLog>>.Ok(logs));
+        }
+
+        // Delai de validation estime pour cette demande (moyenne sur tous les
+        // validateurs actifs) - affiche cote demandeur sur le suivi de sa demande.
+        // Renvoie delaiEstimeJours: null si le modele n'est pas encore entraine
+        // (pas assez de demandes tranchees pour l'instant) - le front doit gerer ce cas.
+        [HttpGet("{id}/delai-estime")]
+        public async Task<IActionResult> GetDelaiEstime(int id)
+        {
+            try
+            {
+                var demande = await _service.GetByIdAsync(id);
+                var montant = demande.Articles.Sum(a => a.PrixDeRevient);
+
+                var delaiEstimeJours = await _estimationDelaiService.EstimerDelaiPourMontantAsync(montant);
+
+                return Ok(ApiResponse<object>.Ok(new
+                {
+                    demandeId = id,
+                    montant,
+                    delaiEstimeJours = delaiEstimeJours.HasValue ? Math.Round(delaiEstimeJours.Value, 1) : (double?)null
+                }));
+            }
+            catch (KeyNotFoundException)
+            {
+                return NotFound(ApiResponse<object>.Fail($"Demande {id} introuvable."));
+            }
         }
     }
 }

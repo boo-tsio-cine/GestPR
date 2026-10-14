@@ -169,24 +169,26 @@ export default function Valid() {
                                     <td><strong>DEM-{String(d.id).padStart(3, '0')}</strong></td>
                                     <td>{new Date(d.dateTime).toLocaleDateString('fr-FR')}</td>
                                     <td>
-                                        <span style={{
-                                            backgroundColor: d.status === "Nouvelle" ? "#a9caf5" : d.status === "En attente" ? "#FEF9C3" : d.status === "Validée" ? "#DCFCE7" : "#FFE4E6",
-                                            color: d.status === "Nouvelle" ? "#000927" : d.status === "En attente" ? "#854D0E" : d.status === "Validée" ? "#166534" : "#9F1239",
-                                            padding: '0.35rem 0.6rem',
-                                            borderRadius: '0.35rem',
-                                            fontWeight: 500,
-                                            fontSize: '0.85rem'
-                                        }}>
-                                            {d.status}
-                                        </span>
+<span style={{
+    backgroundColor: d.status === "Nouvelle" ? "#a9caf5" : d.status === "En cours" ? "#fef3c7" : d.status === "Validée" ? "#DCFCE7" : "#FFE4E6",
+    color: d.status === "Nouvelle" ? "#000927" : d.status === "En cours" ? "#b45309" : d.status === "Validée" ? "#166534" : "#9F1239",
+    padding: '0.35rem 0.6rem',
+    borderRadius: '0.35rem',
+    fontWeight: 500,
+    fontSize: '0.85rem'
+}}>
+    {d.status}
+</span>
                                     </td>
                                     <td className="text-center">
-                                        <button 
-                                            className="btn btn-primary btn-sm"
-                                            onClick={() => ouvrirDialog(d)}
-                                        >
-                                            🛠️ Traiter
-                                        </button>
+                                        {d.status !== "Validée" && (
+                                            <button
+                                                className="btn btn-primary btn-sm"
+                                                onClick={() => ouvrirDialog(d)}
+                                            >
+                                                🛠️ Traiter
+                                            </button>
+                                        )}
                                     </td>
                                 </tr>
                             ))}
@@ -249,20 +251,22 @@ export default function Valid() {
                             />
                         </div>
 
-                        <div className="d-flex justify-content-center gap-3">
-                            <button 
-                                className="btn btn-success btn-lg"
-                                onClick={() => handleDecision(selectedDemande.id, "Validée")}
-                            >
-                                ✔️ Valider
-                            </button>
-                            <button 
-                                className="btn btn-danger btn-lg"
-                                onClick={() => handleDecision(selectedDemande.id, "Refusée")}
-                            >
-                                ❌ Refuser
-                            </button>
-                        </div>
+{selectedDemande.status !== "Validée" && (
+                                        <div className="d-flex justify-content-center gap-3">
+                                            <button
+                                                className="btn btn-success btn-lg"
+                                                onClick={() => handleDecision(selectedDemande.id, "Validée")}
+                                            >
+                                                ✔️ Valider
+                                            </button>
+                                            <button
+                                                className="btn btn-danger btn-lg"
+                                                onClick={() => handleDecision(selectedDemande.id, "Refusée")}
+                                            >
+                                                ❌ Refuser
+                                            </button>
+                                        </div>
+                                    )}
                     </>
                 )}
             </dialog>

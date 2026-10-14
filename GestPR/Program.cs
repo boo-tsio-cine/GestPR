@@ -11,6 +11,7 @@ using GestPR.Service.Audit;
 using GestPR.Service.Demandes;
 using GestPR.Service.Email;
 using GestPR.Service.MachineLearning;
+using GestPR.Service.Ocr;
 using GestPR.Service.Renaissance;
 using GestPR.Service.Taux_Historic;
 using HealthChecks.UI.Client;
@@ -175,27 +176,28 @@ namespace GestPR
             builder.Services.AddScoped<CoursChangeService>();
             builder.Services.AddScoped<AnomalyDetectionService>();
             builder.Services.AddScoped<AchatDatasetService>();
-            builder.Services.AddScoped<GestPR.Service.MachineLearning.IAchatDatasetService>(sp =>
+            builder.Services.AddScoped<IAchatDatasetService>(sp =>
                 sp.GetRequiredService<AchatDatasetService>());
-            builder.Services.AddScoped<GestPR.Service.MachineLearning.ValidationDatasetService>();
-            builder.Services.AddScoped<GestPR.Service.MachineLearning.IValidationDatasetService>(sp =>
-                sp.GetRequiredService<GestPR.Service.MachineLearning.ValidationDatasetService>());
-            builder.Services.AddScoped<GestPR.Service.MachineLearning.DelaiValidationService>();
-            builder.Services.AddScoped<GestPR.Service.Ocr.OcrService>();
+            builder.Services.AddScoped<ValidationDatasetService>();
+            builder.Services.AddScoped<IValidationDatasetService>(sp =>
+                sp.GetRequiredService<ValidationDatasetService>());
+            builder.Services.AddScoped<DelaiValidationService>();
+            builder.Services.AddScoped<OcrService>();
             builder.Services.AddMemoryCache();
             builder.Services.AddScoped<IDatasetEntrainementService, DatasetEntrainementService>();
             builder.Services.AddScoped<IAnomalyDetectionService, AnomalyDetectionService>();
             builder.Services.AddScoped<IEvaluationService, EvaluationService>();
             // ⬇️ Ligne manquante : sans elle, RenaissanceDto reste un objet vide (BaseUrl="")
             //    même si appsettings.json contient bien la section "RenaissanceApi".
-
+            // Program.cs
+            //builder.Services.AddScoped<DatasetExtractionService>();
             builder.Services.AddScoped<IDossierPdfParserService, DossierPdfParserService>();
             builder.Services.AddScoped<IComparateurDossierService, ComparateurDossierService>();
             builder.Services.AddHttpClient<ILlmExplicateurService, LlmExplicateurService>();
-            builder.Services.Configure<GestPR.Dtos.RenaissanceDto>(
+            builder.Services.Configure<RenaissanceDto>(
                 builder.Configuration.GetSection("RenaissanceApi"));
 
-            builder.Services.AddHttpClient<GestPR.Service.Renaissance.RenaissanceService>();
+            builder.Services.AddHttpClient<RenaissanceService>();
 
             // Health Checks
             builder.Services.AddHealthChecks()
@@ -278,3 +280,5 @@ namespace GestPR
         }
     }
 }
+
+public partial class Program { }

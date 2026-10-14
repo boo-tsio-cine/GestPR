@@ -1,24 +1,28 @@
 using GestPR.Data;
 using GestPR.Dtos;
-using GestPR.Models;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
-using MongoDB.Driver;
 
 namespace GestPR.Service.MachineLearning
 {
     public class ValidationDatasetService : IValidationDatasetService
     {
         private readonly AppDbContext _context;
-        private readonly IMongoCollection<AuditLog> _auditCollection;
 
-        public ValidationDatasetService(AppDbContext context, IMongoDatabase mongoDatabase, IOptions<MongoDbSetting> settings)
+        public ValidationDatasetService(AppDbContext context)
         {
             _context = context;
-            _auditCollection = mongoDatabase.GetCollection<AuditLog>(settings.Value.CollectionName);
         }
 
-        // Retourne le dataset exploitable, et le nombre de demandes écartées faute de trace d'audit
+        // Retourne le dataset exploitable, et le nombre de demandes ecartees
+        // (montant calculable mais pas encore completement tranchees :
+        // ValidateurId / DateTransmissionValidation / DateValidation manquants).
+        //
+        // Avant : ce service interrogeait MongoDB (une requete par demande) et
+        // mesurait le delai depuis la creation de la demande par le demandeur,
+        // ce qui incluait aussi le temps de traitement du comptable.
+        // Desormais : tout vient de SQL (ValidateurId/DateTransmissionValidation/
+        // DateValidation ajoutes sur Demande), et on mesure uniquement le temps
+        // reellement passe en attente de decision du validateur.
         public async Task<(List<ValidationDatasetRow> Dataset, int NbDemandesSansAuditTrail)> GetDatasetAsync()
         {
             // 1. Demandes ayant un montant calculable (au moins un article avec un prix valide)
@@ -28,40 +32,35 @@ namespace GestPR.Service.MachineLearning
                 .ToListAsync();
 
             var dataset = new List<ValidationDatasetRow>();
-            int sansAuditTrail = 0;
+            int sansHistoriqueExploitable = 0;
 
             foreach (var demande in demandes)
             {
-                // 2. Le log d'audit "Validation" le plus ancien pour cette demande
-                //    (au cas où plusieurs événements existeraient, on prend le premier)
-                var logValidation = await _auditCollection
-                    .Find(l => l.DemandeId == demande.Id && l.Action == "Validation")
-                    .SortBy(l => l.DateAction)
-                    .FirstOrDefaultAsync();
-
-                if (logValidation == null)
+                if (demande.ValidateurId == null
+                    || demande.DateTransmissionValidation == null
+                    || demande.DateValidation == null)
                 {
-                    sansAuditTrail++;
-                    continue; // pas de trace exploitable pour cette demande
+                    sansHistoriqueExploitable++;
+                    continue; // pas encore tranchee, ou donnee incomplete
                 }
 
                 double montant = (double)demande.Articles.Sum(a => a.PrixDeRevient);
-                double nbJours = (logValidation.DateAction - demande.DateTime).TotalDays;
+                double nbJours = (demande.DateValidation.Value - demande.DateTransmissionValidation.Value).TotalDays;
 
-                if (nbJours < 0) continue; // donnée incohérente (horloge, fuseau...), écartée par sécurité
+                if (nbJours < 0) continue; // donnee incoherente (horloge, fuseau...), ecartee par securite
 
                 dataset.Add(new ValidationDatasetRow
                 {
                     DemandeId = demande.Id,
                     Montant = montant,
-                    ValidateurId = logValidation.UtilisateurId,
+                    ValidateurId = demande.ValidateurId.Value,
                     NbJours = Math.Round(nbJours, 2),
                     DateCreation = demande.DateTime,
-                    DateValidation = logValidation.DateAction
+                    DateValidation = demande.DateValidation.Value
                 });
             }
 
-            return (dataset, sansAuditTrail);
+            return (dataset, sansHistoriqueExploitable);
         }
     }
 }

@@ -1,4 +1,5 @@
-﻿// Service/DemandeService.cs
+// Service/DemandeService.cs
+using GestPR.Data;
 using GestPR.Dtos;
 using GestPR.Models;
 using GestPR.Repository;
@@ -22,7 +23,7 @@ namespace GestPR.Service
     {
         private readonly IDemandeRepository _repo;
         private readonly IEmailService _emailService;
-        private readonly GestPR.Data.AppDbContext _context;
+        private readonly AppDbContext _context;
         private readonly IConfiguration _config;
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly IServiceScopeFactory _scopeFactory;
@@ -31,10 +32,10 @@ namespace GestPR.Service
         private readonly IDistributedCache _cache;
 
         public DemandeService(
-            IDemandeRepository repo, 
-            IEmailService emailService, 
-            IConfiguration config, 
-            GestPR.Data.AppDbContext context, 
+            IDemandeRepository repo,
+            IEmailService emailService,
+            IConfiguration config,
+            AppDbContext context,
             IHttpContextAccessor httpContextAccessor,
             IServiceScopeFactory scopeFactory,
             IAuditService auditService,
@@ -75,9 +76,6 @@ namespace GestPR.Service
         }
 
         // Crée une demande avec ses articles
-        // Modifie l'import au début si nécessaire pour utiliser EntityFrameworkCore (si besoin de SingleOrDefaultAsync)
-        // ou utilise une méthode de ton repository pour chercher par username.
-
         public async Task<DemandeAvecArticleResponseDto> CreateAvecArticlesAsync(DemandeAvecArticleCreateDto dto)
         {
             // 1. Validation des articles
@@ -135,7 +133,7 @@ namespace GestPR.Service
                     NouveauStatut = created.Status,
                     Commentaire = created.Motif,
                     Details = new
-                    {   
+                    {
                         NombreArticles = created.Articles.Count,
                         Articles = created.Articles.Select(a => new { a.Id, a.CodeLot, a.Designation })
                     }
@@ -172,7 +170,7 @@ namespace GestPR.Service
                     <tr style='border-bottom: 1px solid #ddd; text-align: left;'>
                         <td style='padding: 10px; border-right: 1px solid #ddd;'>{art.Id}</td>
                         <td style='padding: 10px; border-right: 1px solid #ddd;'>{art.Designation}</td>
-                        <td style='padding: 10px; border-right: 1px solid #ddd;'>{art.CodeLot}</td> 
+                        <td style='padding: 10px; border-right: 1px solid #ddd;'>{art.CodeLot}</td>
                         <td style='padding: 10px; border-right: 1px solid #ddd;'>{art.CodeArticle}</td>
                         <td style='padding: 10px;'>{art.DescArticle}</td>
                     </tr>";
@@ -183,7 +181,7 @@ namespace GestPR.Service
                 <div style='font-family: Arial, sans-serif; color: #333; line-height: 1.6; max-width: 800px;'>
                     <p>Bonjour,</p>
                     <p>Vous avez une demande à traiter :</p>
-            
+
                     <!-- Premier tableau : Demandeur -->
                     <table style='width: 100%; border-collapse: collapse; margin-bottom: 25px; border: 1px solid #ddd;'>
                         <thead>
@@ -225,7 +223,7 @@ namespace GestPR.Service
                     <p style='margin-top: 25px;'>Cordialement,</p>
                 </div>";
 
-                    // 🚨 MODIFICATION : On fait l'envoi en direct (synchrone) pour intercepter 
+                    // 🚨 MODIFICATION : On fait l'envoi en direct (synchrone) pour intercepter
                     // et afficher immédiatement les erreurs de connexion SMTP de ton réseau STAR.
                     await _emailService.SendHtmlEmailAsync(emailsComptables, "Prix de revient des marchandises importées", htmlBody);
                     Console.WriteLine("[SMTP] Mail envoyé avec succès aux comptables !");
@@ -254,8 +252,6 @@ namespace GestPR.Service
         }
 
         // 💡 UN SEUL BLOC : Reçoit le fichier, génère le GUID unique et l'enregistre sur le disque dur
-
-
         public async Task<bool> SoumettreDemandeAsync(int id, IFormFile pdfFile, string articlesJson, string? commentaire, string? typeDossier, string? immo, string? devise, decimal? cours)
         {
             var demande = await _repo.GetByIdAsync(id);
@@ -264,39 +260,10 @@ namespace GestPR.Service
             string ancienStatut = demande.Status;
             demande.Commentaire = commentaire;
 
-            // 1. Désérialisation sécurisée des articles
-            // 1. Enregistrement des prix de revient des articles
+            // 1. Désérialisation sécurisée des articles / Enregistrement des prix de revient
             List<ArticlePrixDto>? articlesSaisis = null;
             if (!string.IsNullOrWhiteSpace(articlesJson))
             {
-                //try
-                //{
-                //    articlesSaisis = System.Text.Json.JsonSerializer.Deserialize<List<ArticlePrixDto>>(articlesJson, new System.Text.Json.JsonSerializerOptions
-                //        {
-                //            PropertyNameCaseInsensitive = true
-                //        }
-
-                //    );
-
-                //    if (articlesSaisis != null)
-                //    {
-                //        foreach (var artSaisi in articlesSaisis)
-                //        {
-                //            var articleBdd = demande.Articles.FirstOrDefault(a => a.Id == artSaisi.ArticleId);
-                //            if (articleBdd != null)
-                //            {
-                //                articleBdd.PrixDeRevient = artSaisi.PrixDeRevient;
-                //            }
-                //        }
-                //    }
-
-                //}
-                //catch(System.Text.Json.JsonException)
-                //{
-                //    // Ignore le parsing si la chaîne n'est pas du JSON valide (ex: "string" envoyé depuis Swagger)
-                //    Console.WriteLine("[WARN] Le champ articlesJson ne contient pas un tableau JSON d'articles valide.");
-                //}
-
                 try
                 {
                     var rawJson = articlesJson.Trim();
@@ -349,6 +316,11 @@ namespace GestPR.Service
             }
 
             demande.Status = "En cours";
+
+            // 🕒 Point de depart du chrono pour l'estimation du delai de validation :
+            // c'est a partir d'ici que la demande attend une decision du validateur.
+            demande.DateTransmissionValidation = DateTime.UtcNow;
+
             await _repo.SaveChangesAsync();
 
             // 💾 REDIS : mémorise le dernier cours saisi pour cette devise,
@@ -503,7 +475,8 @@ namespace GestPR.Service
         }
 
         // 💡 Prise de décision finale + modification du motif
-        public async Task<bool> UpdateStatusAsync(int id, string nouveauStatut, string motifDecision)
+        // validateurId : qui prend cette decision - necessaire pour l'historique ML du delai de validation
+        public async Task<bool> UpdateStatusAsync(int id, string nouveauStatut, string motifDecision, int validateurId)
         {
             var demande = await _repo.GetByIdAsync(id);
             if (demande == null) return false;
@@ -515,6 +488,11 @@ namespace GestPR.Service
                 demande.Motif = motifDecision; // Met à jour le motif avec la raison du validateur
             }
 
+            // 🕒 Decision finale du validateur : on fige qui a valide et quand,
+            // pour pouvoir reconstituer {Montant, ValidateurId, DelaiJours} a l'entrainement.
+            demande.ValidateurId = validateurId;
+            demande.DateValidation = DateTime.UtcNow;
+
             await _repo.SaveChangesAsync();
 
             // 🍃 AUDIT MONGODB : Traçabilité du changement de statut (Validation / Rejet)
@@ -524,7 +502,8 @@ namespace GestPR.Service
                 {
                     DemandeId = demande.Id,
                     Action = nouveauStatut.Equals("Validé", StringComparison.OrdinalIgnoreCase) ? "Validation" : "MiseAJourStatut",
-                    UtilisateurId = demande.DemandeurId,
+                    // 🐛 Corrige : c'est le validateur qui agit ici, pas le demandeur d'origine.
+                    UtilisateurId = validateurId,
                     AncienStatut = ancienStatut,
                     NouveauStatut = nouveauStatut,
                     Commentaire = motifDecision
@@ -540,7 +519,7 @@ namespace GestPR.Service
             {
                 using var scope = _scopeFactory.CreateScope();
                 var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
-                var dbContext = scope.ServiceProvider.GetRequiredService<GestPR.Data.AppDbContext>();
+                var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
                 try
                 {
@@ -684,7 +663,6 @@ namespace GestPR.Service
             return await _auditService.GetLogsByDemandeIdAsync(demandeId);
         }
 
-        // Conversion Model → DTO
         // Conversion Model → DTO
         private static DemandeAvecArticleResponseDto MapToDto(Demande d) => new()
         {

@@ -1,50 +1,101 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
-import { demandeService } from "../../../services/api";
-import { extraireResumeDuPdf } from "../../../utils/extraireDonneesPdf";
+import api, { demandeService } from "../../../services/api";
 import { toast } from "sonner";
 import Nav from "../../nav/nav";
 import "./DetectionAnomalie.css";
 
-const formatAr = (v) => `${Number(v || 0).toFixed(2)} Ar`;
-
-function ExpliquerModal({ article, comparaison, onClose }) {
+function ExpliquerModal({ article, onClose }) {
     if (!article) return null;
+
+    const ecarts = article.comparaison?.ecartsChiffres || [];
+    const differences = article.comparaison?.differencesTexte || [];
+    const aDesDonnees = ecarts.length > 0 || differences.length > 0;
+
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content modal-md" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-content modal-lg" onClick={(e) => e.stopPropagation()}>
                 <div className="modal-header">
-                    <h5>🔍 Analyse d'Écart &amp; Comparaison</h5>
+                    <h5>🔍 Analyse d'écart &amp; comparaison</h5>
                     <button className="btn btn-sm btn-close" onClick={onClose}></button>
                 </div>
                 <div className="modal-body">
                     <p><strong>Désignation :</strong> {article.designation || "N/A"}</p>
                     <p><strong>Code Lot :</strong> {article.codeLot || "N/A"}</p>
-                    <p><strong>Statut :</strong> {article.status || "N/A"}</p>
-
-                    {comparaison ? (
-                        <div className="alert alert-warning mt-3">
-                            <h6>Analyse Comparative :</h6>
-                            <ul className="mb-0">
-                                <li><strong>Prix Historique (Réf DEM-{article.demandeId || article.id || "N/A"}) :</strong> {formatAr(comparaison.prixAncien)}</li>
-                                <li><strong>Prix Actuel en cours :</strong> {formatAr(comparaison.prixNouveau)}</li>
-                                <li>
-                                    <strong>Écart constaté :</strong>{" "}
-                                    <span className={comparaison.ecartAbsolu > 0 ? "text-danger" : "text-success"}>
-                                        {comparaison.ecartAbsolu > 0 ? "+" : ""}{formatAr(comparaison.ecartAbsolu)} ({comparaison.ecartPourcent}%)
-                                    </span>
-                                </li>
-                            </ul>
-                        </div>
-                    ) : (
-                        <p><strong>Prix de revient historique :</strong> {article.prixDeRevient ? formatAr(article.prixDeRevient) : "N/A"}</p>
-                    )}
+                    <p><strong>Prix de revient :</strong> {article.prixDeRevient ? `${article.prixDeRevient.toFixed(2)} Ar` : "N/A"}</p>
 
                     <hr />
-                    <p className="text-muted small mb-0">
-                        Cet écart peut provenir d'une hausse des frais de transport, du cours de change
-                        ou d'une erreur de saisie des quantités/prix FOB.
-                    </p>
+
+                    {article.chargementExplication ? (
+                        <div className="text-center my-3">
+                            <div className="spinner-border spinner-border-sm text-primary" role="status"></div>
+                            <span className="ms-2">Analyse en cours...</span>
+                        </div>
+                    ) : (
+                        <>
+                            {article.explication && (
+                                <div className="mb-3">
+                                    <strong>Explication :</strong>
+                                    <p className="mt-1">{article.explication}</p>
+                                </div>
+                            )}
+
+                            {aDesDonnees ? (
+                                <div className="table-responsive">
+                                    <table className="table table-bordered table-sm align-middle">
+                                        <thead className="table-light">
+                                            <tr>
+                                                <th>Champ</th>
+                                                <th className="text-end">Ancien (référence)</th>
+                                                <th className="text-end">Nouveau (en cours)</th>
+                                                <th className="text-end">Écart</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {ecarts.map((e) => (
+                                                <tr key={e.libelle}>
+                                                    <td><strong>{e.libelle}</strong></td>
+                                                    <td className="text-end">
+                                                        {e.valeurAncienne != null
+                                                            ? `${Math.round(e.valeurAncienne).toLocaleString("fr-FR")} Ar`
+                                                            : "N/A"}
+                                                    </td>
+                                                    <td className="text-end">
+                                                        {e.valeurNouvelle != null
+                                                            ? `${Math.round(e.valeurNouvelle).toLocaleString("fr-FR")} Ar`
+                                                            : "N/A"}
+                                                    </td>
+                                                    <td
+                                                        className="text-end"
+                                                        style={{
+                                                            color: (e.ecartPourcent ?? 0) > 0 ? "#B3261E" : "#1E7B45",
+                                                            fontWeight: 600,
+                                                        }}
+                                                    >
+                                                        {e.ecartPourcent != null
+                                                            ? `${e.ecartPourcent > 0 ? "+" : ""}${e.ecartPourcent}%`
+                                                            : "Nouveau poste"}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            {differences.map((t) => (
+                                                <tr key={t.libelle}>
+                                                    <td><strong>{t.libelle}</strong></td>
+                                                    <td className="text-end">{t.valeurAncienne || "N/A"}</td>
+                                                    <td className="text-end">{t.valeurNouvelle || "N/A"}</td>
+                                                    <td className="text-end text-muted">Modifié</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ) : (
+                                !article.explication && (
+                                    <p className="text-muted">Aucune donnée de comparaison disponible.</p>
+                                )
+                            )}
+                        </>
+                    )}
                 </div>
             </div>
         </div>
@@ -55,18 +106,14 @@ export default function DetectionAnomalie() {
     const { designation } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
+    const nouveauTraitement = location.state?.nouveauTraitement || null;
 
-    const [nouveauTraitement, setNouveauTraitement] = useState(
-        location.state?.nouveauTraitement || null
-    );
     const [historique, setHistorique] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedArticle, setSelectedArticle] = useState(null);
-    const [comparaisonResult, setComparaisonResult] = useState(null);
     const [selectedDemande, setSelectedDemande] = useState(null);
     const [currentPdfUrl, setCurrentPdfUrl] = useState("");
     const [pdfFileName, setPdfFileName] = useState("");
-    const [motif, setMotif] = useState("");
     const dialogRef = useRef(null);
 
     useEffect(() => {
@@ -88,42 +135,41 @@ export default function DetectionAnomalie() {
             .finally(() => setLoading(false));
     }, [designation, navigate]);
 
-    const expliquerAnomalie = (artHistorique) => {
-        setSelectedArticle(artHistorique);
-
+    // Appelle le vrai backend : parse le PDF de reference, compare tous les postes
+    // avec le traitement en cours, et renvoie l'explication (LLM ou repli).
+    const expliquer = async (art) => {
         if (!nouveauTraitement) {
-            setComparaisonResult(null);
+            toast.error("Ouvrez cette page depuis le traitement de la demande pour comparer.");
             return;
         }
-        try {
-            const article = (nouveauTraitement.articles || []).find(
-                (a) => a.designation === designation
-            );
-            const prixNouveau = article?.puAriary || 0;
-            const prixAncien = artHistorique.prixDeRevient || 0;
-            const ecartAbsolu = prixNouveau - prixAncien;
-            const ecartPourcent = prixAncien ? Number(((ecartAbsolu / prixAncien) * 100).toFixed(2)) : 0;
 
-            setComparaisonResult({ prixAncien, prixNouveau, ecartAbsolu, ecartPourcent });
+        setSelectedArticle({ ...art, chargementExplication: true });
+
+        try {
+            const res = await api.post("/Anomalie/expliquer", {
+                demandeIdReference: art.id || art.demandeId,
+                nouveauTraitement,
+            });
+            setSelectedArticle({
+                ...art,
+                chargementExplication: false,
+                explication: res.data?.data?.explication || "",
+                comparaison: res.data?.data?.comparaison || null,
+            });
         } catch (err) {
-            console.error("Erreur de comparaison :", err);
-            setComparaisonResult(null);
+            console.error("Erreur explication :", err);
+            toast.error("Impossible d'obtenir l'explication de l'anomalie.");
+            setSelectedArticle({ ...art, chargementExplication: false });
         }
     };
 
     const ouvrirDialog = async (d) => {
         setSelectedDemande(d);
-        setMotif(d.motif || "");
         setPdfFileName(d.pdfFileName || "");
         try {
             const response = await demandeService.getPdf(d.id || d.demandeId);
             const blob = new Blob([response.data], { type: "application/pdf" });
             setCurrentPdfUrl(URL.createObjectURL(blob));
-
-            if (!nouveauTraitement) {
-                const resume = await extraireResumeDuPdf(blob);
-                if (resume) setNouveauTraitement(resume);
-            }
         } catch (err) {
             console.error("Erreur de chargement du PDF :", err);
             setCurrentPdfUrl("");
@@ -140,7 +186,6 @@ export default function DetectionAnomalie() {
         setSelectedDemande(null);
         setCurrentPdfUrl("");
         setPdfFileName("");
-        setMotif("");
     };
 
     const telechargerPdf = () => {
@@ -164,14 +209,15 @@ export default function DetectionAnomalie() {
                 </div>
 
                 {nouveauTraitement ? (
-                    <div className="alert alert-info py-2 mt-3 mb-0">
+                    <div className="alert alert-info py-2 mt-3 mb-0 text-center">
                         Comparaison active avec le traitement en cours
                         {nouveauTraitement.idDemande ? ` (DEM-${String(nouveauTraitement.idDemande).padStart(3, "0")})` : ""}.
-                        Cliquez sur « Expliquer » pour afficher l'écart.
+                        {/* Cliquez sur « Expliquer » pour afficher le détail poste par poste. */}
                     </div>
                 ) : (
-                    <div className="alert alert-secondary py-2 mt-3 mb-0">
-                        Aucun traitement en cours transmis. Ouvrez le PDF d'une demande pour charger ses données de comparaison.
+                    <div className="alert alert-warning py-2 mt-3 mb-0">
+                        ℹ️ Cette page a été ouverte sans les données du traitement en cours — le bouton « Expliquer »
+                        ne fonctionnera pas. Revenez au traitement de la demande et utilisez le bouton depuis cet écran.
                     </div>
                 )}
 
@@ -221,12 +267,12 @@ export default function DetectionAnomalie() {
                                         </td>
                                         <td>
                                             <div className="d-flex gap-1">
-                                                <button
+                                                {/* <button
                                                     className="btn btn-sm btn-info text-dark"
-                                                    onClick={() => expliquerAnomalie(art)}
+                                                    onClick={() => expliquer(art)}
                                                 >
                                                     💡 Expliquer
-                                                </button>
+                                                </button> */}
                                                 <button
                                                     className="btn btn-sm btn-primary"
                                                     onClick={() => ouvrirDialog(art)}
@@ -244,14 +290,7 @@ export default function DetectionAnomalie() {
             </div>
 
             {selectedArticle && (
-                <ExpliquerModal
-                    article={selectedArticle}
-                    comparaison={comparaisonResult}
-                    onClose={() => {
-                        setSelectedArticle(null);
-                        setComparaisonResult(null);
-                    }}
-                />
+                <ExpliquerModal article={selectedArticle} onClose={() => setSelectedArticle(null)} />
             )}
 
             <dialog ref={dialogRef} className="fiche-dialog">
@@ -261,11 +300,7 @@ export default function DetectionAnomalie() {
                             <h5 className="m-0">Traitement de la demande DEM-{String(selectedDemande.id || selectedDemande.demandeId).padStart(3, "0")}</h5>
                             <div className="d-flex gap-2">
                                 {currentPdfUrl && (
-                                    <button
-                                        className="btn btn-success btn-sm"
-                                        onClick={telechargerPdf}
-                                        title="Télécharger le PDF"
-                                    >
+                                    <button className="btn btn-success btn-sm" onClick={telechargerPdf} title="Télécharger le PDF">
                                         📥 Télécharger
                                     </button>
                                 )}

@@ -1,5 +1,5 @@
-﻿using GestPR.Data;
-using GestPR.Models;
+﻿using global::GestPR.Data;
+using global::GestPR.Models;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
