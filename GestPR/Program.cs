@@ -6,6 +6,7 @@ using GestPR.Repository;
 using GestPR.Repository.Demandes;
 using GestPR.Repository.Taux_Historic;
 using GestPR.Service;
+using GestPR.Service.Agents;
 using GestPR.Service.Anomalies;
 using GestPR.Service.Audit;
 using GestPR.Service.Demandes;
@@ -73,7 +74,7 @@ namespace GestPR
                 {
                     options.SuppressModelStateInvalidFilter = true;
                 });
-
+            builder.Services.AddControllers();
             // Configuration CORS pour le frontend React
             builder.Services.AddCors(options =>
             {
@@ -193,12 +194,19 @@ namespace GestPR
             //builder.Services.AddScoped<DatasetExtractionService>();
             builder.Services.AddScoped<IDossierPdfParserService, DossierPdfParserService>();
             builder.Services.AddScoped<IComparateurDossierService, ComparateurDossierService>();
+            builder.Services.AddScoped<DatasetExtractionService>();
             builder.Services.AddHttpClient<ILlmExplicateurService, LlmExplicateurService>();
             builder.Services.Configure<RenaissanceDto>(
                 builder.Configuration.GetSection("RenaissanceApi"));
 
+<<<<<<< HEAD
             builder.Services.AddHttpClient<RenaissanceService>();
 
+=======
+            builder.Services.AddHttpClient<GestPR.Service.Renaissance.RenaissanceService>();
+            // Program.cs
+            builder.Services.AddScoped<OptimisationRepartitionService>();
+>>>>>>> 27f240a (Mise à jour du projet)
             // Health Checks
             builder.Services.AddHealthChecks()
                 .AddSqlServer(
@@ -213,6 +221,11 @@ namespace GestPR
                     sp => sp.GetRequiredService<IMongoClient>(),
                     name: "MongoDB Audit",
                     tags: new[] { "db", "nosql" });
+
+            builder.Services.AddSingleton<AgentCommunicationChannel>();
+            builder.Services.AddHostedService<AgentOcrService>();
+            builder.Services.AddHostedService<AgentControleFinancierService>();
+            builder.Services.AddHostedService<AgentRoutageService>();
 
             // =========================================================
             // 2. MIDDLEWARES PIPELINE

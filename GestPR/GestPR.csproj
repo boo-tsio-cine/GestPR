@@ -21,7 +21,10 @@
     <PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="9.0.0" />
     <PackageReference Include="BCrypt.Net-Next" Version="4.2.0" />
     <PackageReference Include="ClosedXML" Version="0.105.1" />
+<<<<<<< HEAD
     <PackageReference Include="FluentAssertions" Version="8.11.0" />
+=======
+>>>>>>> 27f240a (Mise à jour du projet)
     <PackageReference Include="Google.OrTools" Version="9.15.6755" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.Negotiate" Version="8.0.12" />
@@ -67,6 +70,12 @@
     <Folder Include="Tests\Services\" />
     <Folder Include="WebApi\" />
   </ItemGroup>
+
+	<ItemGroup>
+		<None Include="tessdata\**\*.*">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
 
 	
 </Project>

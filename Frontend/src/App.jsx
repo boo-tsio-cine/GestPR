@@ -17,6 +17,7 @@ import Comptabilite from "./components/comptabilite/comptabilite";
 import { TraitementDemande } from "./components/comptabilite/traitement/traitementDemande";
 import DetectionAnomalie from "./components/comptabilite/traitement/DetectionAnomalie";
 import Valid from "./components/validateur/valid";
+import TraitementAutomatiqueDocument from "./components/comptabilite/traitement/traitementAutomatiqueDocument";
 
 function App() {
   const { user, login} = useAuth();
@@ -83,6 +84,7 @@ function App() {
       <Route path="/home@validateur" element={<ProtectedRoute roles={["Validateur"]}><Valid /></ProtectedRoute>} />
       <Route path="/home@comptabilite" element={<ProtectedRoute roles={["Comptabilité"]}><Comptabilite/></ProtectedRoute>} />
       <Route path="/traiter-demande/:id"  element={<ProtectedRoute roles={["Comptabilité"]}><TraitementDemande/></ProtectedRoute>} />
+      <Route path="/traitementautomatique"  element={<ProtectedRoute roles={["Comptabilité"]}><TraitementAutomatiqueDocument/></ProtectedRoute>} />
       <Route path="/detection-anomalie/:designation" element={<ProtectedRoute roles={["Comptabilité"]}><DetectionAnomalie/></ProtectedRoute>} />
       {/* Si l'URL n'est pas reconnue ou qu'il y a un problème, retour à l'accueil de bienvenue */}
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -553,10 +553,37 @@ export function TraitementDemande(){
         lignes, saisies, resultatsParArticle, idDemande: id,
     }), [dossierData, valeurCAF, detailFraisApproche, fraisApprocheTotalCalcule, lignes, saisies, resultatsParArticle, id]);
 
+    const [budgetSimulation, setBudgetSimulation] = useState("");
+    const [resultatSimulation, setResultatSimulation] = useState(null);
+    const [simulationEnCours, setSimulationEnCours] = useState(false);
+    const [contraintes, setContraintes] = useState({});
+    const [resultatOptimisation, setResultatOptimisation] = useState(null);
+    const [resteSimulation, setResteSimulation] = useState(0);
+
+
+     // Pré-remplit montantMin avec le prix unitaire déjà saisi, comme valeur de départ
+    useEffect(() => {
+        setContraintes((prev) => {
+            const next = { ...prev };
+            lignes.forEach(({ rowKey }) => {
+                const prixActuel = saisies[rowKey]?.prixUnitaire;
+                if (prixActuel && !next[rowKey]?.montantMin) {
+                    next[rowKey] = { ...next[rowKey], montantMin: prixActuel };
+                }
+            });
+            return next;
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [lignes, saisies]);
     // ─────────────────────────────────────────────────────────────────────────
     // RENDER CONDITIONNEL RESTRUCTURÉ (Correction de l'écran blanc)
     // ─────────────────────────────────────────────────────────────────────────
     
+
+    // Conception des agents logiciels autonomes (Agent OCR, Agent Contrôleur Financier, Agent Routage) et de leur canal de communication.
+
+
+
     // 1️⃣ PRIORITÉ : Afficher l'aperçu si activé
     if (afficherApercu) {
         const articlesFormates = lignes.map(({ rowKey, lot }) => ({
@@ -599,9 +626,155 @@ export function TraitementDemande(){
         );
     }
 
+   
+    const lancerSimulationBudget = async () => {
+        if (!budgetSimulation || parseFloat(budgetSimulation) <= 0) {
+            toast.error("Veuillez saisir un budget total valide.");
+            return;
+        }
+        setSimulationEnCours(true);
+        try {
+            const budget = Math.round(parseFloat(budgetSimulation));
+
+            const articlesPayload = lignes
+                .map(({ rowKey, lot }) => {
+                    const saisie = saisies[rowKey] || emptyArticleSaisie();
+                    const pu = parseFloat(saisie.prixUnitaire) || 0;
+                    return {
+                        articleId: rowKey,
+                        designation: lot.designation,
+                        montantMin: Math.round(pu),
+                        montantMax: budget,
+                        pu,
+                    };
+                })
+                .filter((a) => a.pu > 0);
+
+            if (articlesPayload.length === 0) {
+                toast.error("Saisissez d'abord le montant (devise) des articles.");
+                return;
+            }
+
+            const response = await api.post(
+                `/optimisation/optimiser-repartition?budgetTotal=${budget}`,
+                articlesPayload.map(({ articleId, designation, montantMin, montantMax }) => ({
+                    articleId, designation, montantMin, montantMax,
+                }))
+            );
+
+            const resultat = response.data;
+            const quantites = {};
+            articlesPayload.forEach((a) => {
+                const montantAlloue = resultat.repartitionParArticle?.[a.articleId] || 0;
+                quantites[a.articleId] = a.pu > 0 ? montantAlloue / a.pu : 0;
+            });
+
+            setResultatSimulation({ ...resultat, quantites });
+        } catch (err) {
+            toast.error("Erreur lors de la simulation du budget.");
+        } finally {
+            setSimulationEnCours(false);
+        }
+    };
+
+
+ 
+
+
+    const updateContrainte = (rowKey, field, value) => {
+        setContraintes((prev) => ({
+            ...prev,
+            [rowKey]: { ...prev[rowKey], [field]: value },
+        }));
+    };
+
+   
+
+    const lancerSimulationOptimisation = async () => {
+        if (!budgetSimulation || parseFloat(budgetSimulation) <= 0) {
+            toast.error("Renseignez un budget total pour la simulation.");
+            return;
+        }
+
+        const articlesPourSimulation = lignes.map(({ rowKey, lot }, index) => ({
+            articleId: index,
+            designation: lot.designation,
+            montantMin: parseFloat(contraintes[rowKey]?.montantMin) || 0,
+            montantMax: parseFloat(contraintes[rowKey]?.montantMax) || 0,
+        }));
+
+        const articlesInvalides = articlesPourSimulation.filter(
+            (a) => a.montantMax <= 0 || a.montantMin > a.montantMax
+        );
+        if (articlesInvalides.length > 0) {
+            toast.error("Vérifiez les montants min/max de chaque article (min ≤ max, max > 0).");
+            return;
+        }
+
+        setSimulationEnCours(true);
+        setResultatOptimisation(null);
+        try {
+            const response = await api.post(
+                `/optimisation/optimiser-repartition?budgetTotal=${Math.round(parseFloat(budgetSimulation))}`,
+                articlesPourSimulation
+            );
+            setResultatOptimisation(response.data);
+
+           if (response.data.faisable) {
+                toast.success("Répartition optimale calculée — tableau mis à jour automatiquement.");
+
+                // 1) Quantités brutes (avec décimales) + partie fractionnaire de chaque article
+                const brut = lignes.map(({ rowKey }, index) => {
+                    const montantAlloue = response.data.repartitionParArticle?.[index] || 0;
+                    const montantMin = parseFloat(contraintes[rowKey]?.montantMin) || 0;
+                    const quantiteBrute = montantMin > 0 ? montantAlloue / montantMin : 0;
+                    const quantiteEntiere = Math.floor(quantiteBrute);
+                    return {
+                        rowKey,
+                        montantMin,
+                        montantAlloue,
+                        quantiteEntiere,
+                        fraction: quantiteBrute - quantiteEntiere, // ex: 3.33 -> 0.33 ; 2.77 -> 0.77
+                    };
+                });
+
+                // 2) Cagnotte : argent "perdu" sur chaque article à cause de l'arrondi à l'entier inférieur
+                let cagnotte = brut.reduce(
+                    (somme, a) => somme + (a.montantAlloue - a.quantiteEntiere * a.montantMin),
+                    0
+                );
+
+                // 3) Redistribution : on complète en priorité les articles les plus proches
+                //    de l'unité suivante (ex: 2.77 avant 3.33, car 0.77 > 0.33)
+                const ordreParFraction = [...brut].sort((a, b) => b.fraction - a.fraction);
+                for (const a of ordreParFraction) {
+                    if (a.montantMin > 0 && cagnotte >= a.montantMin) {
+                        a.quantiteEntiere += 1;
+                        cagnotte -= a.montantMin;
+                    }
+                }
+
+                // 4) Application : quantité entière définitive + montant recalculé en conséquence
+                brut.forEach((a) => {
+                    updateSaisieArticle(a.rowKey, "quantite", String(a.quantiteEntiere));
+                    updateSaisieArticle(a.rowKey, "prixUnitaire", (a.quantiteEntiere * a.montantMin).toFixed(2));
+                });
+
+                setResteSimulation(cagnotte);
+            } else {
+                toast.warning("Aucune répartition possible avec ce budget et ces contraintes.");
+                setResteSimulation(0);
+            }
+        } catch (err) {
+            toast.error("Erreur lors de la simulation d'optimisation.");
+        } finally {
+            setSimulationEnCours(false);
+        }
+    };
+
     // 2️⃣ Gérer l'état de chargement
     if (loading) {
-        return (
+        return (    
             <>
                 <Nav />
                 <div className="container" style={{ marginTop: "10rem" }}>
@@ -632,6 +805,10 @@ export function TraitementDemande(){
                     <h2 className="traiter-title mb-0">Traitement de la Demande N° {String(id).padStart(3, '0')}</h2>
                     <button className="btn btn-secondary btn-sm" onClick={() => navigate("/home@comptabilite")}>
                         ⬅️ Retour
+                    </button>
+                  
+                    <button className="btn btn-secondary btn-sm" onClick={() => navigate("/traitementautomatique")}>
+                        Visualiser l'existant
                     </button>
                 </div>
                 <div className=" traiter-page ">
@@ -922,7 +1099,7 @@ export function TraitementDemande(){
                                                             disabled={loadingAnomalie[rowKey] || !r.puAriary || r.puAriary <= 0}
                                                             title={!r.puAriary || r.puAriary <= 0 ? "Renseignez d'abord la quantité et le prix unitaire" : "Revérifier immédiatement (vérification automatique après 1s d'inactivité)"}
                                                         >
-                                                             {loadingAnomalie[rowKey] ? "Vérification..." : "Revérifier"}
+                                                            {loadingAnomalie[rowKey] ? "Vérification..." : "Revérifier"}
                                                         </button>
                                                     </td>
                                                     <td>
@@ -1032,6 +1209,8 @@ export function TraitementDemande(){
                                                         )}
                                                     </td>
                                                 </tr>
+
+                                                
                                             );
                                         })}
                                     </tbody>
@@ -1046,6 +1225,253 @@ export function TraitementDemande(){
                                         </tr>
                                     </tfoot>
                                 </table>
+                                {/* <div className="card mt-3 p-4 border-primary">
+                                    <h4>Simulation budgétaire <small className="text-muted fw-normal">(indicatif, n'affecte pas le traitement)</small></h4>
+                                    <div className="row g-3 align-items-end">
+                                        <div className="col-md-4">
+                                            <label className="form-label">Budget total disponible (devise)</label>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                className="form-control"
+                                                value={budgetSimulation}
+                                                onChange={(e) => setBudgetSimulation(e.target.value)}
+                                                placeholder="Ex: 8000"
+                                            />
+                                        </div>
+                                        <div className="col-md-4">
+                                            <button type="button" className="btn btn-outline-primary" onClick={lancerSimulationBudget} disabled={simulationEnCours}>
+                                                {simulationEnCours ? "Calcul..." : "Simuler la répartition"}
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {resultatSimulation && (
+                                        <div className="mt-3">
+                                            {resultatSimulation.faisable ? (
+                                                <>
+                                                    <p className="text-success mb-2">
+                                                        ✓ Budget utilisé : {fmt(resultatSimulation.budgetUtilise, 2)} / {budgetSimulation}
+                                                    </p>
+                                                    <table className="table table-sm table-bordered">
+                                                         <thead className="table-light">
+                                                            <tr><th>Article</th><th className="text-end">Quantité nécessaire</th></tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {lignes.map(({ rowKey, lot }) => (
+                                                                <tr key={rowKey}>
+                                                                    <td>{lot.designation}</td>
+                                                                    <td className="text-end"><strong>{fmt(resultatSimulation.quantites?.[rowKey] || 0, 2)}</strong></td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </>
+                                            ) : (
+                                                <p className="text-danger mb-0">✗ Budget insuffisant pour couvrir les montants minimums requis.</p>
+                                            )}
+                                        </div>
+                                    )}
+                                </div> */}
+
+                           
+                                <div className="card mt-5 p-4">
+                                    <h4>Simulation — Répartition budgétaire optimisée</h4>
+                                    <p className="text-muted">
+                                        Définissez un budget total disponible et des bornes min/max par article pour simuler
+                                        la meilleure répartition possible avant soumission.
+                                    </p>
+
+                                    <div className="row g-3 mb-3">
+                                        <div className="col-md-4">
+                                            <label className="form-label">Budget total disponible (Ar)</label>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                className="form-control"
+                                                value={budgetSimulation}
+                                                onChange={(e) => setBudgetSimulation(e.target.value)}
+                                                placeholder="Ex: 8000000"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="table-responsive">
+                                        <table className="table table-bordered table-sm align-middle">
+                                            <thead className="table-light">
+                                                <tr>
+                                                    <th>Désignation</th>
+                                                    <th>Montant min (Ar)</th>
+                                                    <th>Montant max (Ar)</th>
+                                                    <th>Montant alloué (résultat)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {lignes.map(({ rowKey, lot }, index) => {
+                                                    const c = contraintes[rowKey] || {};
+                                                    const montantAlloue = resultatOptimisation?.repartitionParArticle?.[index];
+                                                    return (
+                                                        <tr key={rowKey}>
+                                                            <td>
+                                                                <strong>{lot.codeLot}</strong>
+                                                                <br />
+                                                                <small className="text-muted">{lot.designation}</small>
+                                                            </td>
+                                                            <td>
+                                                                <input
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    className="form-control form-control-sm"
+                                                                    value={c.montantMin || ""}
+                                                                    onChange={(e) => updateContrainte(rowKey, "montantMin", e.target.value)}
+                                                                    placeholder="0"
+                                                                />
+                                                            </td>
+                                                            <td>
+                                                                <input
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    className="form-control form-control-sm"
+                                                                    value={c.montantMax || ""}
+                                                                    onChange={(e) => updateContrainte(rowKey, "montantMax", e.target.value)}
+                                                                    placeholder="0"
+                                                                />
+                                                            </td>
+                                                            <td className="text-end">
+                                                                {montantAlloue !== undefined ? (
+                                                                    <strong className="text-success">{fmt(montantAlloue, 0)} Ar</strong>
+                                                                ) : (
+                                                                    <span className="text-muted">—</span>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        className="btn btn-outline-primary"
+                                        onClick={lancerSimulationOptimisation}
+                                        disabled={simulationEnCours}
+                                    >
+                                        {simulationEnCours ? "Calcul en cours..." : "Lancer la simulation"}
+                                    </button>
+
+                                    {resultatOptimisation && (
+                                        <div className="mt-3">
+                                            {resultatOptimisation.faisable ? (
+                                                <p className="text-success mb-0">
+                                                    ✓ Solution trouvée — Budget utilisé : {fmt(resultatOptimisation.budgetUtilise, 0)} / {fmt(parseFloat(budgetSimulation), 0)} Ar
+                                                </p>
+                                            ) : (
+                                                <p className="text-danger mb-0">
+                                                    ✗ Aucune répartition possible : le budget est insuffisant par rapport aux montants minimums requis.
+                                                </p>
+                                            )}
+                                            {resultatOptimisation.faisable && resteSimulation > 0.01 && (
+                                                <p className="text-muted mb-0 mt-2">
+                                                    Reste non affecté après ajustement à l'entier : <strong>{fmt(resteSimulation, 2)} Ar</strong>
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    <div className="card shadow-sm mt-4">
+                                        <div className="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                                            <span>Ventilation optimale des frais annexes</span>
+                                            <button
+                                                className="btn btn-light btn-sm fw-bold"
+                                                onClick={lancerSimulationOptimisation}
+                                                disabled={simulationEnCours}
+                                            >
+                                                {simulationEnCours ? (
+                                                    <>
+                                                        <span className="spinner-border spinner-border-sm me-2" role="status" />
+                                                        Calcul en cours...
+                                                    </>
+                                                ) : (
+                                                    <>⚡ Calculer la répartition optimale</>
+                                                )}
+                                            </button>
+                                        </div>
+
+                                        <div className="card-body">
+                                            <div className="mb-3">
+                                                <label className="form-label">Budget total disponible (Ar)</label>
+                                                <input
+                                                    type="number"
+                                                    className="form-control"
+                                                    value={budgetSimulation}
+                                                    onChange={(e) => setBudgetSimulation(e.target.value)}
+                                                    placeholder="Ex : 15000"
+                                                />
+                                            </div>
+
+                                            <table className="table table-sm table-bordered align-middle">
+                                                <thead className="table-light">
+                                                    <tr>
+                                                        <th>Article</th>
+                                                        <th>Montant min (Ar)</th>
+                                                        <th>Montant max (Ar)</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {lignes.map(({ rowKey, lot }) => (
+                                                        <tr key={rowKey}>
+                                                            <td>{lot.designation}</td>
+                                                            <td>
+                                                                <input
+                                                                    type="number"
+                                                                    className="form-control form-control-sm"
+                                                                    value={contraintes[rowKey]?.montantMin || ""}
+                                                                    onChange={(e) =>
+                                                                        setContraintes((prev) => ({
+                                                                            ...prev,
+                                                                            [rowKey]: { ...prev[rowKey], montantMin: e.target.value },
+                                                                        }))
+                                                                    }
+                                                                />
+                                                            </td>
+                                                            <td>
+                                                                <input
+                                                                    type="number"
+                                                                    className="form-control form-control-sm"
+                                                                    value={contraintes[rowKey]?.montantMax || ""}
+                                                                    onChange={(e) =>
+                                                                        setContraintes((prev) => ({
+                                                                            ...prev,
+                                                                            [rowKey]: { ...prev[rowKey], montantMax: e.target.value },
+                                                                        }))
+                                                                    }
+                                                                />
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+
+                                            {resultatOptimisation && (
+                                                <div className={`alert ${resultatOptimisation.faisable ? "alert-success" : "alert-danger"} mb-0`}>
+                                                    {resultatOptimisation.faisable ? (
+                                                        <>
+                                                            ✓ Solution trouvée — Budget utilisé : {fmt(resultatOptimisation.budgetUtilise, 2)} / {fmt(budgetSimulation, 2)} Ar
+                                                            {resteSimulation > 0.01 && (
+                                                                <p className="mb-0 mt-2">
+                                                                    Reste non affecté après ajustement à l'entier : <strong>{fmt(resteSimulation, 2)} Ar</strong>
+                                                                </p>
+                                                            )}
+                                                        </>
+                                                    ) : (
+                                                        <>✗ Aucune répartition possible : le budget est insuffisant par rapport aux montants minimums requis.</>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
                                 <div className="col-12 mt-3">
                                     <label className="form-label text-muted">Commentaire :</label>
                                     <textarea

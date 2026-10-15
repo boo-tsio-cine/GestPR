@@ -59,7 +59,7 @@ namespace GestPR.Middleware
             };
 
             var json = JsonSerializer.Serialize(response, options);
-
+            await context.Response.WriteAsync(json);
         }
     }
 }

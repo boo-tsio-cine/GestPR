@@ -34,6 +34,7 @@ namespace GestPR.Models
 
         // === Clé étrangère (IMPORTANT) ===
         public int DemandeurId { get; set; }
+        public DateOnly? DateValidation { get; set; }
 
         // === Propriété de navigation ===
         public ApplicationUser? Demandeur { get; set; }

@@ -29,5 +29,7 @@ namespace GestPR.Models
         // 💰 Nouvelle colonne pour stocker le prix de revient (PU en Ariary)
         [Column(TypeName = "decimal(18,4)")]
         public decimal PrixDeRevient { get; set; }
+
+        public Demande Demande { get; set; }
     }
 }
