@@ -375,7 +375,10 @@ function DemandesTable({ data, empty, onDetail, onVoirAudit }) {
                                         Voir la fiche 
                                     </button>
                                 )}
+
                             </div>
+
+                            
                         </div>
                     </div>
                 ))}

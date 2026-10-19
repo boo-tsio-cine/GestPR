@@ -12,7 +12,7 @@ namespace GestPR.Service
         public string CodeLot { get; set; }
         public string Designation { get; set; }
         public decimal PrixDeRevient { get; set; }
-        public DateOnly DateValidation { get; set; }   // ← DateOnly au lieu de DateTime
+        public DateTime DateValidation { get; set; }   // ← DateOnly au lieu de DateTime
     }
 
     public class DatasetExtractionResult
@@ -43,7 +43,7 @@ namespace GestPR.Service
                      demande => demande.Id,
                      (article, demande) => new { article, demande })
                  .Where(x => x.demande.Status == "Validée"
-                          && EF.Property<DateOnly?>(x.demande, nameof(Demande.DateValidation)) != null)
+                          && x.demande.DateValidation != null)
                  .Select(x => new DatasetEntry
                  {
                      CodeArticle = x.article.CodeArticle,

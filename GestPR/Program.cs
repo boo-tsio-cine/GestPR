@@ -13,6 +13,7 @@ using GestPR.Service.Demandes;
 using GestPR.Service.Email;
 using GestPR.Service.MachineLearning;
 using GestPR.Service.Ocr;
+using GestPR.Service.Receptions;
 using GestPR.Service.Renaissance;
 using GestPR.Service.Taux_Historic;
 using HealthChecks.UI.Client;
@@ -188,6 +189,10 @@ namespace GestPR
             builder.Services.AddScoped<IDatasetEntrainementService, DatasetEntrainementService>();
             builder.Services.AddScoped<IAnomalyDetectionService, AnomalyDetectionService>();
             builder.Services.AddScoped<IEvaluationService, EvaluationService>();
+
+            builder.Services.AddScoped<ReceptionService>();
+            builder.Services.AddScoped<FournisseurFiabiliteService>();
+
             // ⬇️ Ligne manquante : sans elle, RenaissanceDto reste un objet vide (BaseUrl="")
             //    même si appsettings.json contient bien la section "RenaissanceApi".
             // Program.cs
@@ -199,14 +204,14 @@ namespace GestPR
             builder.Services.Configure<RenaissanceDto>(
                 builder.Configuration.GetSection("RenaissanceApi"));
 
-<<<<<<< HEAD
+
             builder.Services.AddHttpClient<RenaissanceService>();
 
-=======
-            builder.Services.AddHttpClient<GestPR.Service.Renaissance.RenaissanceService>();
+
+            //builder.Services.AddHttpClient<GestPR.Service.Renaissance.RenaissanceService>();
             // Program.cs
             builder.Services.AddScoped<OptimisationRepartitionService>();
->>>>>>> 27f240a (Mise à jour du projet)
+
             // Health Checks
             builder.Services.AddHealthChecks()
                 .AddSqlServer(
@@ -226,6 +231,11 @@ namespace GestPR
             builder.Services.AddHostedService<AgentOcrService>();
             builder.Services.AddHostedService<AgentControleFinancierService>();
             builder.Services.AddHostedService<AgentRoutageService>();
+            builder.Services.AddScoped<AgentControleurRisqueService>();
+            builder.Services.AddScoped<AgentNegociateurService>();
+            builder.Services.AddScoped<IEstimationDelaiService, EstimationDelaiService>();
+            builder.Services.AddScoped<ReceptionService>();
+            builder.Services.AddScoped<FournisseurFiabiliteService>();
 
             // =========================================================
             // 2. MIDDLEWARES PIPELINE

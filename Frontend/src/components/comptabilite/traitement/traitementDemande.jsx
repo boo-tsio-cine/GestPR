@@ -810,6 +810,10 @@ export function TraitementDemande(){
                     <button className="btn btn-secondary btn-sm" onClick={() => navigate("/traitementautomatique")}>
                         Visualiser l'existant
                     </button>
+
+                     <button className="btn btn-secondary btn-sm" onClick={() => navigate("/agent-coordinateur")}>
+                        ⬅️ Agent 
+                    </button>
                 </div>
                 <div className=" traiter-page ">
                     <p><strong>Date de création :</strong> {demandes.date ? new Date(demandes.date).toLocaleDateString('fr-FR') : "Inconnue"}</p>
@@ -1496,6 +1500,10 @@ export function TraitementDemande(){
                     </form>
                 </div>
             </div>
+
+            {/* import BoutonConfirmerReception from "../components/BoutonConfirmerReception"; */}
+
+           
             
             {designationSelectionnee && (
                 <div className="modal-overlay" onClick={() => setDesignationSelectionnee(null)}>

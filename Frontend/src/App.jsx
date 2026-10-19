@@ -18,6 +18,8 @@ import { TraitementDemande } from "./components/comptabilite/traitement/traiteme
 import DetectionAnomalie from "./components/comptabilite/traitement/DetectionAnomalie";
 import Valid from "./components/validateur/valid";
 import TraitementAutomatiqueDocument from "./components/comptabilite/traitement/traitementAutomatiqueDocument";
+import AgentCoordinateur from "./components/validateur/agentCoordinateur";
+import AgentsDecision from "./page/AgentsDecision";
 
 function App() {
   const { user, login} = useAuth();
@@ -86,8 +88,11 @@ function App() {
       <Route path="/traiter-demande/:id"  element={<ProtectedRoute roles={["Comptabilité"]}><TraitementDemande/></ProtectedRoute>} />
       <Route path="/traitementautomatique"  element={<ProtectedRoute roles={["Comptabilité"]}><TraitementAutomatiqueDocument/></ProtectedRoute>} />
       <Route path="/detection-anomalie/:designation" element={<ProtectedRoute roles={["Comptabilité"]}><DetectionAnomalie/></ProtectedRoute>} />
+      <Route path="/agent-coordinateur" element={<ProtectedRoute roles={["Comptabilité"]}><AgentCoordinateur/></ProtectedRoute>} />
       {/* Si l'URL n'est pas reconnue ou qu'il y a un problème, retour à l'accueil de bienvenue */}
       <Route path="*" element={<Navigate to="/" replace />} />
+
+      <Route path="/agents-decision" element={<AgentsDecision />} />
     </Routes>
   );
 }

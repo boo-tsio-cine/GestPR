@@ -4,9 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace GestPR.Controllers
 {
-<<<<<<< HEAD
-   
-=======
+
 
     [ApiController]
     [Route("api/admin")]
@@ -32,5 +30,5 @@ namespace GestPR.Controllers
         [AllowAnonymous]   // pour éliminer l'authentification de l'équation
         public IActionResult Ping() => Ok("pong");
     }
->>>>>>> 27f240a (Mise à jour du projet)
+
 }

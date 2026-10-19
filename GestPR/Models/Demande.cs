@@ -34,7 +34,7 @@ namespace GestPR.Models
 
         // === Clé étrangère (IMPORTANT) ===
         public int DemandeurId { get; set; }
-        public DateOnly? DateValidation { get; set; }
+        public DateTime? DateValidation { get; set; }
 
         // === Propriété de navigation ===
         public ApplicationUser? Demandeur { get; set; }
@@ -50,8 +50,7 @@ namespace GestPR.Models
         public DateTime? DateTransmissionValidation { get; set; }
 
         // Date de la decision finale du validateur (remplie dans UpdateStatusAsync)
-        public DateTime? DateValidation { get; set; }
-
+       
         // Qui a pris la decision finale (null tant que la demande n'est pas tranchee)
         public int? ValidateurId { get; set; }
         public ApplicationUser? Validateur { get; set; }
@@ -59,5 +58,9 @@ namespace GestPR.Models
         // Derniere fois qu'un mail de relance a ete envoye pour cette demande
         // (evite de spammer les validateurs a chaque execution du job planifie).
         public DateTime? DateDerniereRelance { get; set; }
+
+        public DateTime? DateReception { get; set; }
+        public int? DelaiReelJours { get; set; }
+        public string? Fournisseur { get; set; }
     }
 }
