@@ -24,9 +24,10 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Server.IISIntegration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using MongoDB.Bson.Serialization;
-using MongoDB.Bson.Serialization.Serializers;
-using MongoDB.Driver;
+// ─── MongoDB désactivé (plus de base MongoDB requise) ───────────────
+//using MongoDB.Bson.Serialization;
+//using MongoDB.Bson.Serialization.Serializers;
+//using MongoDB.Driver;
 
 namespace GestPR
 {
@@ -129,28 +130,32 @@ namespace GestPR
             builder.Services.AddScoped<GrilleFraisService>();
 
             builder.Services.AddTransient<IEmailService, EmailService>();
+
+            // Cache en mémoire (processus) : remplace Redis, aucune instance Redis requise.
             builder.Services.AddDistributedMemoryCache();
 
-            // Configuration MongoDB
-            builder.Services.Configure<MongoDbSetting>(builder.Configuration.GetSection("MongoDbSetting"));
+            // ─── MongoDB désactivé (plus de base MongoDB requise) ───────────────
+            //builder.Services.Configure<MongoDbSetting>(builder.Configuration.GetSection("MongoDbSetting"));
+            //
+            //builder.Services.AddSingleton<IMongoClient>(sp =>
+            //{
+            //    var settings = sp.GetRequiredService<IOptions<MongoDbSetting>>().Value;
+            //    return new MongoClient(settings.ConnectionString);
+            //});
+            //
+            //builder.Services.AddScoped(sp =>
+            //{
+            //    var settings = sp.GetRequiredService<IOptions<MongoDbSetting>>().Value;
+            //    var client = sp.GetRequiredService<IMongoClient>();
+            //    return client.GetDatabase(settings.DatabaseName);
+            //});
 
-            builder.Services.AddSingleton<IMongoClient>(sp =>
-            {
-                var settings = sp.GetRequiredService<IOptions<MongoDbSetting>>().Value;
-                return new MongoClient(settings.ConnectionString);
-            });
-
-            builder.Services.AddScoped(sp =>
-            {
-                var settings = sp.GetRequiredService<IOptions<MongoDbSetting>>().Value;
-                var client = sp.GetRequiredService<IMongoClient>();
-                return client.GetDatabase(settings.DatabaseName);
-            });
-
+            // Service d'audit : version en mémoire (journalisation locale, sans MongoDB).
             builder.Services.AddScoped<IAuditService, AuditService>();
 
-            var objectSerializer = new ObjectSerializer(ObjectSerializer.AllAllowedTypes);
-            BsonSerializer.RegisterSerializer(objectSerializer);
+            // ─── Sérialiseur BSON MongoDB désactivé ─────────────────────────────
+            //var objectSerializer = new ObjectSerializer(ObjectSerializer.AllAllowedTypes);
+            //BsonSerializer.RegisterSerializer(objectSerializer);
 
             // Validation du ModelState
             builder.Services.Configure<ApiBehaviorOptions>(options =>
@@ -167,12 +172,13 @@ namespace GestPR
                 };
             });
 
-            // Redis
-            builder.Services.AddStackExchangeRedisCache(options =>
-            {
-                options.Configuration = builder.Configuration.GetConnectionString("Redis");
-                options.InstanceName = "GestPR_";
-            });
+            // ─── Redis désactivé (le cache en mémoire AddDistributedMemoryCache
+            //     enregistré plus haut prend le relais sur IDistributedCache) ───
+            //builder.Services.AddStackExchangeRedisCache(options =>
+            //{
+            //    options.Configuration = builder.Configuration.GetConnectionString("Redis");
+            //    options.InstanceName = "GestPR_";
+            //});
 
             builder.Services.AddScoped<DeviseService>();
             builder.Services.AddScoped<CoursChangeService>();
@@ -217,15 +223,16 @@ namespace GestPR
                 .AddSqlServer(
                     connectionString: builder.Configuration.GetConnectionString("DefaultConnection")!,
                     name: "SQL Server",
-                    tags: new[] { "db", "sql" })
-                .AddRedis(
-                    redisConnectionString: builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379",
-                    name: "Redis Cache",
-                    tags: new[] { "cache", "redis" })
-                .AddMongoDb(
-                    sp => sp.GetRequiredService<IMongoClient>(),
-                    name: "MongoDB Audit",
-                    tags: new[] { "db", "nosql" });
+                    tags: new[] { "db", "sql" });
+                // ─── Redis et MongoDB désactivés dans les health checks ─────────
+                //.AddRedis(
+                //    redisConnectionString: builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379",
+                //    name: "Redis Cache",
+                //    tags: new[] { "cache", "redis" })
+                //.AddMongoDb(
+                //    sp => sp.GetRequiredService<IMongoClient>(),
+                //    name: "MongoDB Audit",
+                //    tags: new[] { "db", "nosql" });
 
             builder.Services.AddSingleton<AgentCommunicationChannel>();
             builder.Services.AddHostedService<AgentOcrService>();

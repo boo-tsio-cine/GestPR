@@ -1,12 +1,13 @@
-﻿using MongoDB.Bson;
-using MongoDB.Bson.Serialization.Attributes;
+﻿// ─── MongoDB désactivé (plus de base MongoDB requise) ───────────────
+//using MongoDB.Bson;
+//using MongoDB.Bson.Serialization.Attributes;
 
 namespace GestPR.Models
 {
     public class AuditLog
     {
-        [BsonId]
-        [BsonRepresentation(BsonType.ObjectId)]
+        //[BsonId]
+        //[BsonRepresentation(BsonType.ObjectId)]
         public string? Id { get; set; }
         public int DemandeId { get; set; } // ID de la demande associée à l'action
         public string Action { get; set; } = string.Empty;// ex: "TRAITEMENT_DEMANDE"

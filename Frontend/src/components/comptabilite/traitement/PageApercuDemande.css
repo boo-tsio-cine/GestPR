@@ -27,7 +27,7 @@
     background: #ffffff; 
     width: 210mm; 
     min-height: 297mm; 
-    padding: 20mm; 
+    padding: 12mm 15mm; /* Réduction du padding (de 20mm à 12mm) pour gagner de l'espace vertical */
     margin: 10px auto 0 auto; 
     box-shadow: 0 0 15px rgba(0, 0, 0, 0.4); 
     position: relative; 
@@ -55,7 +55,7 @@
 .pdf-header { 
     border-bottom: 2px solid #333; 
     padding-bottom: 5px; 
-    margin-bottom: 20px; 
+    margin-bottom: 10px; 
 }
 
 .pdf-header h3 { margin: 0; font-size: 16px; font-weight: bold; color: #111; }
@@ -103,11 +103,11 @@
 .table-pdf { 
     width: 100%; 
     border-collapse: collapse; 
-    font-size: 12px; 
-    margin-bottom: 10px; 
+    font-size: 11px; 
+    margin-bottom: 8px; 
 }
 
-.table-pdf td { padding: 6px; border: 1px solid #ddd; }
+.table-pdf td { padding:3px 6px; border: 1px solid #ddd; }
 .leaf-bold { font-weight: bold; background-color: #fafafa; }
 .table-row-highlight { background-color: #e9ecef; }
 
@@ -142,10 +142,10 @@
 .table-articles { 
     width: 100%; 
     border-collapse: collapse; 
-    font-size: 12px; 
+    font-size: 11px; 
     margin-top: 10px; 
-    page-break-inside: avoid; 
-    break-inside: avoid; 
+    page-break-inside: auto; 
+    break-inside: auto; 
 }
 
 .table-articles thead {
@@ -157,8 +157,13 @@
     break-inside: avoid;
 }
 
-.table-articles th { background-color: #343a40; color: white; padding: 8px; font-weight: 600; text-align: left; }
-.table-articles td { padding: 8px; border-bottom: 1px solid #eee; }
+.table-articles tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+.table-articles th { background-color: #343a40; color: white; padding: 6px; font-weight: 600; text-align: left; }
+.table-articles td { padding: 6px; border-bottom: 1px solid #eee; }
 .table-articles tbody tr:nth-child(even) { background-color: #f9f9f9; }
 
 .font-monospace-bold { font-weight: bold; font-family: monospace; font-size: 13px; }
@@ -183,10 +188,16 @@
     .page-a4 { box-shadow: none; margin: 0; padding: 0; width: 100%; }
 }
 
+/* Règle CSS native de saut de page pour l'impression / PDF */
+.page-break-before {
+    page-break-before: always !important;
+    break-before: page !important;
+    margin-top: 20mm; /* Marge propre en haut de la nouvelle page */
+}
 
 .image{
-    width: 10rem;
-    height: 3.5rem;
+    width: 8.5rem;
+    height: 2.8rem;
     overflow: hidden;
 }
 

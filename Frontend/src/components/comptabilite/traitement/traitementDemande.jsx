@@ -807,13 +807,13 @@ export function TraitementDemande(){
                         ⬅️ Retour
                     </button>
                   
-                    <button className="btn btn-secondary btn-sm" onClick={() => navigate("/traitementautomatique")}>
+                    {/* <button className="btn btn-secondary btn-sm" onClick={() => navigate("/traitementautomatique")}>
                         Visualiser l'existant
                     </button>
 
                      <button className="btn btn-secondary btn-sm" onClick={() => navigate("/agent-coordinateur")}>
                         ⬅️ Agent 
-                    </button>
+                    </button> */}
                 </div>
                 <div className=" traiter-page ">
                     <p><strong>Date de création :</strong> {demandes.date ? new Date(demandes.date).toLocaleDateString('fr-FR') : "Inconnue"}</p>
@@ -829,7 +829,7 @@ export function TraitementDemande(){
                         <p><strong>Matricule :</strong> {demandes.matricule}</p>
                         <p><strong>Site :</strong> {demandes.site || "Non défini"}</p>
                     </div>
-                    <div className="d-flex align-items-center gap-2 mb-3">
+                    {/* <div className="d-flex align-items-center gap-2 mb-3">
                         <label className="btn btn-outline-success btn-sm mb-0">
                             📊 Importer le fichier Excel de calcul
                             <input 
@@ -839,7 +839,7 @@ export function TraitementDemande(){
                                 style={{ display: "none" }} 
                             />
                         </label>
-                    </div>
+                    </div> */}
                     <form onSubmit={handleSubmit} method="post">
                          <div className=" card mt-1 p-4">
                              <div className="row g-3">
@@ -1096,7 +1096,7 @@ export function TraitementDemande(){
                                                         >
                                                             Historique
                                                         </button>
-                                                        <button 
+                                                        {/* <button 
                                                             type="button" 
                                                             className="btn btn-sm btn-link text-warning p-0 ms-2"
                                                             onClick={() => verifierAnomalie(rowKey, lot.designation, lot.codeLot, r.puAriary)}
@@ -1104,7 +1104,7 @@ export function TraitementDemande(){
                                                             title={!r.puAriary || r.puAriary <= 0 ? "Renseignez d'abord la quantité et le prix unitaire" : "Revérifier immédiatement (vérification automatique après 1s d'inactivité)"}
                                                         >
                                                             {loadingAnomalie[rowKey] ? "Vérification..." : "Revérifier"}
-                                                        </button>
+                                                        </button> */}
                                                     </td>
                                                     <td>
                                                         <input
@@ -1153,16 +1153,16 @@ export function TraitementDemande(){
                                                     <td className="text-end">{fmt(r.montant)}</td>
                                                     <td className="text-end">
                                                         <strong>{fmt(r.puAriary)} Ar</strong>
-                                                         {alertesAnomalies[rowKey] && (
+                                                         {/* {alertesAnomalies[rowKey] && (
                                                             <div className="mt-1 d-flex align-items-center gap-1 flex-wrap">
                                                                 {alertesAnomalies[rowKey].nbOccurrencesHistorique === 0 ? (
                                                                     <span className="badge bg-secondary" title={alertesAnomalies[rowKey].message}>
                                                                         Pas d'historique
                                                                     </span>
                                                                 ) : alertesAnomalies[rowKey].scoreAnomalieMl !== null && alertesAnomalies[rowKey].scoreAnomalieMl !== undefined ? (
-                                                                    alertesAnomalies[rowKey].alerteAnomalieMl ? (
-                                                                        /* BOUTON / BADGE EN CAS D'ANOMALIE ML */
-                                                                        <span className="badge bg-danger" title={alertesAnomalies[rowKey].message}>
+                                                                    alertesAnomalies[rowKey].alerteAnomalieMl ? ( */}
+                                                                        {/* /* BOUTON / BADGE EN CAS D'ANOMALIE ML */}
+                                                                        {/* <span className="badge bg-danger" title={alertesAnomalies[rowKey].message}>
                                                                             ⚠️ ML : {Math.round(alertesAnomalies[rowKey].scoreAnomalieMl * 100)}% de risque
                                                                         </span>
                                                                     ) : (
@@ -1170,8 +1170,8 @@ export function TraitementDemande(){
                                                                             ✓ ML : {Math.round(alertesAnomalies[rowKey].scoreAnomalieMl * 100)}% de risque
                                                                         </span>
                                                                     )
-                                                                ) : (
-                                                                    alertesAnomalies[rowKey].alerteEcartRecent ? (
+                                                                ) : ( */}
+                                                                    {/* alertesAnomalies[rowKey].alerteEcartRecent ? (
                                                                         <>
                                                                             <span className="badge bg-warning text-dark" title={alertesAnomalies[rowKey].message}>
                                                                                 ⚠️ {alertesAnomalies[rowKey].ecartVsDernierPrixPourcent > 0 ? "+" : ""}
@@ -1210,7 +1210,7 @@ export function TraitementDemande(){
                                                                     )
                                                                 )}
                                                             </div>
-                                                        )}
+                                                        )} */}
                                                     </td>
                                                 </tr>
 
@@ -1279,7 +1279,7 @@ export function TraitementDemande(){
                                 </div> */}
 
                            
-                                <div className="card mt-5 p-4">
+                                {/* <div className="card mt-5 p-4">
                                     <h4>Simulation — Répartition budgétaire optimisée</h4>
                                     <p className="text-muted">
                                         Définissez un budget total disponible et des bornes min/max par article pour simuler
@@ -1486,7 +1486,7 @@ export function TraitementDemande(){
                                         onChange={(e) => setCommentaire(e.target.value)}
                                         maxLength={1000}
                                     ></textarea>
-                                </div>
+                                </div> */}
                             </div>
                         </div>
                 

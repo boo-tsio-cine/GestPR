@@ -170,7 +170,7 @@ function Comptabilite(){
                                     <option value="">Tous</option>
                                     <option value="Nouvelle">Nouvelle</option>
                                     <option value="En cours">En cours</option>
-                                    <option value="En attente">En attente</option>
+                                    {/* <option value="En attente">En attente</option> */}
                                     <option value="Validée">Validée</option>
                                     <option value="Refusée">Refusée</option>
                                 </select>
@@ -348,12 +348,12 @@ function DemandesTable({ data, empty, onDetail, onVoirAudit }) {
                                 </div>
                             </div>
                             <div className="card-link">
-                                <button 
+                                {/* <button 
                                     className="btn btn-secondary text-white flex items-center gap-1"
                                     onClick={() => onVoirAudit(d.id)}
                                 >
-                                    <History className="h-4 w-4" /> Historique
-                                </button>
+                                    <History className="h-4 w-4" /> Suivi
+                                </button> */}
                                 {d.status === "Nouvelle" ? (
                                     <Link className="btn btn-success text-white" to={`/traiter-demande/${d.id}`} style={{ display:'inline-block', textDecoration:'none'}}>
                                         Traiter la demande

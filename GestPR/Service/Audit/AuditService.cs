@@ -1,40 +1,60 @@
 ﻿using GestPR.Data;
 using GestPR.Models;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
-using MongoDB.Driver;
+//using Microsoft.Extensions.Options;   // plus nécessaire : IOptions<MongoDbSetting> retiré
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+// ─── MongoDB désactivé (plus de base MongoDB requise) ───────────────
+//using MongoDB.Driver;
 
 namespace GestPR.Service.Audit
 {
     public class AuditService : IAuditService
     {
-        private readonly IMongoCollection<AuditLog> _auditCollection;
+        // ─── MongoDB désactivé ──────────────────────────────────────────────
+        //private readonly IMongoCollection<AuditLog> _auditCollection;
         private readonly AppDbContext _sqlContext;
 
-        public AuditService(IMongoDatabase mongoDatabase ,IOptions<MongoDbSetting> setting, AppDbContext sqlContext)
-        {
-            _auditCollection = mongoDatabase.GetCollection<AuditLog>(setting.Value.CollectionName);
+        // Journal d'audit en mémoire (processus) : les logs sont perdus au redémarrage
+        // tant qu'aucun stockage MongoDB n'est réactivé.
+        private static readonly List<AuditLog> _journal = new List<AuditLog>();
+        private static readonly object _journalLock = new object();
 
-            // Création de l'index sur DemandeId s'il n'existe pas
-            var indexKeys = Builders<AuditLog>.IndexKeys.Ascending(log => log.DemandeId);
-            _auditCollection.Indexes.CreateOne(new CreateIndexModel<AuditLog>(indexKeys));
+        //public AuditService(IMongoDatabase mongoDatabase ,IOptions<MongoDbSetting> setting, AppDbContext sqlContext)
+        public AuditService(AppDbContext sqlContext)
+        {
+            //_auditCollection = mongoDatabase.GetCollection<AuditLog>(setting.Value.CollectionName);
+            //
+            //// Création de l'index sur DemandeId s'il n'existe pas
+            //var indexKeys = Builders<AuditLog>.IndexKeys.Ascending(log => log.DemandeId);
+            //_auditCollection.Indexes.CreateOne(new CreateIndexModel<AuditLog>(indexKeys));
 
             _sqlContext = sqlContext;
         }
 
-        public async Task LogActionAsync(AuditLog log)
+        public Task LogActionAsync(AuditLog log)
         {
             if (log.DateAction == default)
             {
                 log.DateAction = DateTime.UtcNow;
             }
-            await _auditCollection.InsertOneAsync(log);
+
+            if (string.IsNullOrEmpty(log.Id))
+            {
+                log.Id = Guid.NewGuid().ToString("N");
+            }
+
+            //await _auditCollection.InsertOneAsync(log);
+            lock (_journalLock)
+            {
+                _journal.Add(log);
+            }
+
+            return Task.CompletedTask;
         }
 
-        public async Task LogActionAsync(
+        public Task LogActionAsync(
             string entityName,
             int demandeId,
             int utilisateurId,
@@ -56,27 +76,42 @@ namespace GestPR.Service.Audit
                 DateAction = DateTime.UtcNow
             };
 
-            await _auditCollection.InsertOneAsync(log);
+            //await _auditCollection.InsertOneAsync(log);
+            return LogActionAsync(log);
         }
 
-        public async Task<IEnumerable<AuditLog>> GetLogsByDemandeIdAsync(int demandeId)
+        public Task<IEnumerable<AuditLog>> GetLogsByDemandeIdAsync(int demandeId)
         {
-            var mongoLogs =  await _auditCollection
-                .Find(log => log.DemandeId == demandeId)
-                .SortByDescending(log => log.DateAction)
-                .ToListAsync();
+            //var mongoLogs =  await _auditCollection
+            //    .Find(log => log.DemandeId == demandeId)
+            //    .SortByDescending(log => log.DateAction)
+            //    .ToListAsync();
+            var mongoLogs = FiltrerParDemande(demandeId);
 
-            return await EnrichLogsWithUserDataAsync(mongoLogs);
+            return EnrichLogsWithUserDataAsync(mongoLogs);
         }
 
-        public async Task<IEnumerable<AuditLog>> GetLogsByEntityAsync(string entityName, int entityId)
+        public Task<IEnumerable<AuditLog>> GetLogsByEntityAsync(string entityName, int entityId)
         {
-            var mongoLogs = await _auditCollection
-                .Find(log => log.DemandeId == entityId)
-                .SortByDescending(log => log.DateAction)
-                .ToListAsync();
+            //var mongoLogs = await _auditCollection
+            //    .Find(log => log.DemandeId == entityId)
+            //    .SortByDescending(log => log.DateAction)
+            //    .ToListAsync();
+            var mongoLogs = FiltrerParDemande(entityId);
 
-            return await EnrichLogsWithUserDataAsync(mongoLogs);
+            return EnrichLogsWithUserDataAsync(mongoLogs);
+        }
+
+        // Lecture du journal en mémoire, du plus récent au plus ancien
+        private static List<AuditLog> FiltrerParDemande(int demandeId)
+        {
+            lock (_journalLock)
+            {
+                return _journal
+                    .Where(l => l.DemandeId == demandeId)
+                    .OrderByDescending(l => l.DateAction)
+                    .ToList();
+            }
         }
 
 

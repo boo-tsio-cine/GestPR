@@ -796,7 +796,7 @@ function DemandesTable({ data, onDetail, onVoirPdf, empty, onVoirAudit }) {
                             </TableCell>
                             <TableCell className="px-4 py-3 text-right">
                                 <div className="flex justify-end gap-2">
-                                    <Button size="sm" 
+                                    {/* <Button size="sm" 
                                         variant="outline" 
                                         className="gap-1" 
                                         onClick={(e) => {
@@ -806,7 +806,7 @@ function DemandesTable({ data, onDetail, onVoirPdf, empty, onVoirAudit }) {
                                         }}
                                     >
                                         <HistoryIcon className="h-4 w-4 text-blue-600" /> Suivi
-                                    </Button>
+                                    </Button> */}
                                     <Button size="sm" variant="outline" className="gap-1 btn_detail" onClick={() => onDetail(d)}>
                                         <span></span>
                                         <span></span>

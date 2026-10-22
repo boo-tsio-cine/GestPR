@@ -636,8 +636,8 @@ export default function PageApercuDemande({idDemande, userRole = "Demandeur", on
                         </tr>
                     </tbody>
                 </table>
-
-                <table className="table-articles">
+                {/* La classe 'page-break-before' s'active automatiquement si valeurs.length >= 2 */}
+                <table className={`table-articles ${valeurs.length >= 2 ? 'page-break-before' : ''}`}>
                     <thead>
                         <tr>
                             <th>Dossier</th>

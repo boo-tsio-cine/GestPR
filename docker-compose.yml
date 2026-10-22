@@ -24,24 +24,30 @@ services:
   # ----------------------------------------
   # 2. Base de données MongoDB (Journal d'audit)
   # ----------------------------------------
-  mongodb:
-    image: mongo:latest
-    container_name: gestpr-mongodb
-    restart: always
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongodb_data:/data/db
+  # mongodb:
+  #   image: mongo:7
+  #   container_name: gestpr-mongodb
+  #   restart: always
+  #   environment:
+  #     MONGO_INITDB_ROOT_USERNAME: gestpr_admin
+  #     MONGO_INITDB_ROOT_PASSWORD: "GestionPR"
+  #   volumes: 
+  #     - mongodb_data:/data/db
+  #   ports:
+  #     - "27017:27017"
 
   # ----------------------------------------
   # 3. Cache Redis
   # ----------------------------------------
-  redis:
-    image: redis:alpine
-    container_name: gestpr-redis
-    restart: always
-    ports:
-      - "6379:6379"
+  # redis:
+  #   image: redis:7
+  #   container_name: gestpr-redis
+  #   restart: always
+  #   command: ["redis-server", "--requirepass", "GestPRRedis"]
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis_data:/data
 
   # ----------------------------------------
   # 4. Backend .NET 8 API
@@ -64,9 +70,10 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: "Development"
       ConnectionStrings__DefaultConnection: "Server=sqlserver,1433;Database=prix_revien_db;User Id=sa;Password=Star2026!;TrustServerCertificate=True;Encrypt=False;"
-      MongoDbSetting__ConnectionString: "mongodb://mongodb:27017"
-      MongoDbSetting__DatabaseName: "GestPR_Audit"
-      ConnectionStrings__Redis: "redis:6379"
+      # MongoDB et Redis désactivés : plus de base MongoDB ni de cache Redis requis
+      #MongoDbSetting__ConnectionString: "mongodb://gestpr_admin:GestionPR@mongodb:27017/?authSource=admin"
+      #MongoDbSetting__DatabaseName: "GestPR_Audit"
+      #ConnectionStrings__Redis: "redis:6379,password=GestPRRedis"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
@@ -76,10 +83,11 @@ services:
     depends_on:
       sqlserver:
         condition: service_healthy
-      mongodb:
-        condition: service_started
-      redis:
-        condition: service_started
+      # MongoDB et Redis désactivés
+      #mongodb:
+      #  condition: service_started
+      #redis:
+      #  condition: service_started
 
   # ----------------------------------------
   # 5. Frontend React
@@ -93,4 +101,5 @@ services:
 
 volumes:
   sqlserver_data:
-  mongodb_data:
+  # mongodb_data:
+  # redis_data:

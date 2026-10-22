@@ -1,5 +1,6 @@
 import { useState } from "react";
-import api from "../api/axios"; // ← même import
+import api from "../services/api";
+
 
 const OFFRES_INITIALES = [
   { fournisseur: "SACOFRINA", prixUnitaire: 5800, delaiLivraisonJours: 15, fournisseurConnu: true },
