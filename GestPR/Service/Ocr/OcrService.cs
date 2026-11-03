@@ -70,7 +70,8 @@ namespace GestPR.Service.Ocr
 
             return await Task.Run(() =>
             {
-                using var engine = new TesseractEngine(_tessDataPath, "fra", EngineMode.Default);
+                //using var engine = new TesseractEngine(_tessDataPath, "fra", EngineMode.Default);
+                using var engine = new TesseractEngine(_tessDataPath, "fra", EngineMode.LstmOnly);
                 using var pix = Pix.LoadFromMemory(imageBytes);
                 using var page = engine.Process(pix);
                 return page.GetText().Trim();

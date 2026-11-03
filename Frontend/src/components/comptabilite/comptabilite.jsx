@@ -348,12 +348,12 @@ function DemandesTable({ data, empty, onDetail, onVoirAudit }) {
                                 </div>
                             </div>
                             <div className="card-link">
-                                {/* <button 
+                                <button 
                                     className="btn btn-secondary text-white flex items-center gap-1"
                                     onClick={() => onVoirAudit(d.id)}
                                 >
                                     <History className="h-4 w-4" /> Suivi
-                                </button> */}
+                                </button>
                                 {d.status === "Nouvelle" ? (
                                     <Link className="btn btn-success text-white" to={`/traiter-demande/${d.id}`} style={{ display:'inline-block', textDecoration:'none'}}>
                                         Traiter la demande

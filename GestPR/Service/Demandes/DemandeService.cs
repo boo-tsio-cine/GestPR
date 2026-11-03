@@ -467,7 +467,7 @@ namespace GestPR.Service
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[SMTP ERROR] Échec lors de l'envoi aux validateurs : {ex.Message}");
+                    Console.WriteLine($"[SMTP ERROR] Échec lors de l'envoi aux validateu rs : {ex.Message}");
                 }
             });
 
