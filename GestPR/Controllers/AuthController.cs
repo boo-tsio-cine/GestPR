@@ -41,7 +41,7 @@ namespace GestPR.Controllers
             {
                 string? rawUser = null;
 
-                // --- 1. Tentative d'obtention sécurisée des variables IIS (Si exécuté sous IIS) ---
+                // --- 1. Tentative d'obtention sï¿½curisï¿½e des variables IIS (Si exï¿½cutï¿½ sous IIS) ---
                 try
                 {
                     var serverVariables = HttpContext.Features.Get<Microsoft.AspNetCore.Http.Features.IServerVariablesFeature>();
@@ -52,7 +52,7 @@ namespace GestPR.Controllers
                 }
                 catch
                 {
-                    // Ignore l'erreur si IServerVariablesFeature n'est pas supporté (ex: Kestrel Linux Docker)
+                    // Ignore l'erreur si IServerVariablesFeature n'est pas supportï¿½ (ex: Kestrel Linux Docker)
                 }
 
                 // --- 2. Identity Claims standard ---
@@ -62,7 +62,7 @@ namespace GestPR.Controllers
                               ?? HttpContext.User?.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
                 }
 
-                // --- 3. MODE MOCK / DÉVELOPPEMENT DOCKER ---
+                // --- 3. MODE MOCK / Dï¿½VELOPPEMENT DOCKER ---
                 // En conteneur Docker Linux, la session Windows distante n'est pas transmise nativement.
                 // Vous pouvez utiliser le header 'X-Forwarded-User' ou basculer sur un utilisateur de test.
                 if (string.IsNullOrEmpty(rawUser) && Request.Headers.TryGetValue("X-Forwarded-User", out var mockUser))
@@ -70,7 +70,7 @@ namespace GestPR.Controllers
                     rawUser = mockUser.ToString();
                 }
 
-                // Nettoyage des comptes système IIS
+                // Nettoyage des comptes systï¿½me IIS
                 if (!string.IsNullOrEmpty(rawUser) &&
                     (rawUser.Contains("IIS APPPOOL", StringComparison.OrdinalIgnoreCase) ||
                      rawUser.Contains("NETWORK SERVICE", StringComparison.OrdinalIgnoreCase) ||
@@ -79,13 +79,13 @@ namespace GestPR.Controllers
                     rawUser = null;
                 }
 
-                // Si aucun utilisateur n'est identifié (cas standard sur Docker sans IIS Proxy)
+                // Si aucun utilisateur n'est identifiï¿½ (cas standard sur Docker sans IIS Proxy)
                 if (string.IsNullOrEmpty(rawUser))
                 {
                     return Unauthorized(new
                     {
                         Connected = false,
-                        Message = "Session Windows d'entreprise non détectée."
+                        Message = "Session Windows d'entreprise non dï¿½tectï¿½e."
                     });
                 }
 
@@ -102,13 +102,13 @@ namespace GestPR.Controllers
                     return Unauthorized(new
                     {
                         Connected = false,
-                        Message = $"L'utilisateur '{cleanedUserName}' n'est pas configuré dans GestPR."
+                        Message = $"L'utilisateur '{cleanedUserName}' n'est pas configurï¿½ dans GestPR."
                     });
                 }
 
                 if (dbUser.IsActive != 1)
                 {
-                    return StatusCode(403, new { Connected = false, Message = "Votre compte est désactivé." });
+                    return StatusCode(403, new { Connected = false, Message = "Votre compte est dï¿½sactivï¿½." });
                 }
 
                 return Ok(new
@@ -125,11 +125,11 @@ namespace GestPR.Controllers
             }
             catch (Exception ex)
             {
-                // Renvoie l'erreur explicite dans la réponse au lieu d'un 500 opaque
+                // Renvoie l'erreur explicite dans la rï¿½ponse au lieu d'un 500 opaque
                 return StatusCode(500, new
                 {
                     Connected = false,
-                    Message = "Erreur lors de la vérification de l'identité en base de données.",
+                    Message = "Erreur lors de la vï¿½rification de l'identitï¿½ en base de donnï¿½es.",
                     Details = ex.InnerException?.Message ?? ex.Message
                 });
             }
@@ -144,22 +144,22 @@ namespace GestPR.Controllers
         //    {
         //        string? rawUser = null;
 
-        //        // --- MANIÈRE 1 : Variables serveur IIS (La méthode reine en déploiement IIS d'entreprise) ---
+        //        // --- MANIï¿½RE 1 : Variables serveur IIS (La mï¿½thode reine en dï¿½ploiement IIS d'entreprise) ---
         //        var serverVariables = HttpContext.Features.Get<Microsoft.AspNetCore.Http.Features.IServerVariablesFeature>();
         //        if (serverVariables != null)
         //        {
         //            rawUser = serverVariables["LOGON_USER"] ?? serverVariables["AUTH_USER"];
         //        }
 
-        //        // --- MANIÈRE 2 : Contexte utilisateur HTTP (S'appuie sur l'authentification Windows du protocole HTTP) ---
+        //        // --- MANIï¿½RE 2 : Contexte utilisateur HTTP (S'appuie sur l'authentification Windows du protocole HTTP) ---
         //        if (string.IsNullOrEmpty(rawUser))
         //        {
         //            rawUser = HttpContext.User?.Identity?.Name
         //                      ?? HttpContext.User?.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
         //        }
 
-        //        // --- SÉCURITÉ DEPLOIEMENT : Suppression absolue d'Environment.UserName ---
-        //        // Si on détecte un compte de service IIS à cause d'une mauvaise configuration système, on refuse
+        //        // --- Sï¿½CURITï¿½ DEPLOIEMENT : Suppression absolue d'Environment.UserName ---
+        //        // Si on dï¿½tecte un compte de service IIS ï¿½ cause d'une mauvaise configuration systï¿½me, on refuse
         //        if (!string.IsNullOrEmpty(rawUser) &&
         //            (rawUser.Contains("IIS APPPOOL", StringComparison.OrdinalIgnoreCase) ||
         //             rawUser.Contains("NETWORK SERVICE", StringComparison.OrdinalIgnoreCase) ||
@@ -168,22 +168,22 @@ namespace GestPR.Controllers
         //            rawUser = null; // On invalide pour forcer une erreur explicite d'authentification utilisateur
         //        }
 
-        //        // --- VÉRIFICATION GLOBALE ---
+        //        // --- Vï¿½RIFICATION GLOBALE ---
         //        if (string.IsNullOrEmpty(rawUser))
         //        {
         //            return Unauthorized(new
         //            {
         //                Connected = false,
-        //                Message = "Impossible d'identifier votre session Windows d'entreprise. Veuillez vérifier que l'authentification Windows est active sur votre navigateur et sur IIS."
+        //                Message = "Impossible d'identifier votre session Windows d'entreprise. Veuillez vï¿½rifier que l'authentification Windows est active sur votre navigateur et sur IIS."
         //            });
         //        }
 
-        //        // Nettoyage du domaine si présent (S_TANA_00\tsio700529 -> tsio700529)
+        //        // Nettoyage du domaine si prï¿½sent (S_TANA_00\tsio700529 -> tsio700529)
         //        string cleanedUserName = rawUser.Contains("\\")
         //            ? rawUser.Split('\\')[1]
         //            : rawUser;
 
-        //        // Recherche de l'utilisateur dans la base de données
+        //        // Recherche de l'utilisateur dans la base de donnï¿½es
         //        var dbUser = await _context.ApplicationUsers
         //            .FirstOrDefaultAsync(u => u.AdUsername.ToLower() == cleanedUserName.ToLower()
         //                                   && u.ApplicationName == "GestPR");
@@ -193,21 +193,21 @@ namespace GestPR.Controllers
         //            return Unauthorized(new
         //            {
         //                Connected = false,
-        //                Message = $"L'utilisateur '{cleanedUserName}' n'est pas configuré pour accéder à l'application GestPR."
+        //                Message = $"L'utilisateur '{cleanedUserName}' n'est pas configurï¿½ pour accï¿½der ï¿½ l'application GestPR."
         //            });
         //        }
 
-        //        // Vérification du statut du compte
+        //        // Vï¿½rification du statut du compte
         //        if (dbUser.IsActive != 1)
         //        {
         //            return StatusCode(403, new
         //            {
         //                Connected = false,
-        //                Message = "Votre compte utilisateur est désactivé."
+        //                Message = "Votre compte utilisateur est dï¿½sactivï¿½."
         //            });
         //        }
 
-        //        // Succès : Envoi des données de l'utilisateur connecté vers le Frontend
+        //        // Succï¿½s : Envoi des donnï¿½es de l'utilisateur connectï¿½ vers le Frontend
         //        return Ok(new
         //        {
         //            Connected = true,
@@ -218,7 +218,7 @@ namespace GestPR.Controllers
         //            Mail = dbUser.Mail,
         //            Role = dbUser.Role,
         //            Site = dbUser.Site,
-        //            RawIdentityUsed = rawUser, // Permet de valider que c'est bien l'AD de l'utilisateur distant qui est reçu
+        //            RawIdentityUsed = rawUser, // Permet de valider que c'est bien l'AD de l'utilisateur distant qui est reï¿½u
         //            Timestamp = DateTime.Now
         //        });
         //    }
@@ -227,7 +227,7 @@ namespace GestPR.Controllers
         //        return StatusCode(500, new
         //        {
         //            Connected = false,
-        //            Message = "Une erreur est survenue lors de la vérification de l'identité.",
+        //            Message = "Une erreur est survenue lors de la vï¿½rification de l'identitï¿½.",
         //            Error = ex.Message
         //        });
         //    }
@@ -271,7 +271,7 @@ namespace GestPR.Controllers
                 emailComplet = $"{model.MailPrefix.Trim()}@castel-afrique.com";
             }
 
-            var nouvelUtilisateur = new ApplicationUser // Modifie le nom de la classe si ton modèle EF s'appelle autrement
+            var nouvelUtilisateur = new ApplicationUser // Modifie le nom de la classe si ton modï¿½le EF s'appelle autrement
             {
                 AdUsername = model.Matricule,
                 ApplicationName = "GestPR",
@@ -287,7 +287,7 @@ namespace GestPR.Controllers
             _context.ApplicationUsers.Add(nouvelUtilisateur);
             await _context.SaveChangesAsync();
 
-            return Ok(new { Message = "Utilisateur créé avec succès !" });
+            return Ok(new { Message = "Utilisateur crï¿½ï¿½ avec succï¿½s !" });
         }
 
         // ==========================================
@@ -301,7 +301,7 @@ namespace GestPR.Controllers
             var dbUser = await _context.ApplicationUsers
                 .FirstOrDefaultAsync(u => u.Id == id && u.ApplicationName == "GestPR");
 
-            if (dbUser == null) return NotFound("Utilisateur non trouvé.");
+            if (dbUser == null) return NotFound("Utilisateur non trouvï¿½.");
 
             string emailComplet = "";
             if (!string.IsNullOrEmpty(model.MailPrefix))
@@ -333,7 +333,7 @@ namespace GestPR.Controllers
                 .FirstOrDefaultAsync(u => u.Id == id && u.ApplicationName == "GestPR");
 
             if (dbUser == null)
-                return NotFound("Utilisateur non trouvé ou n'appartient pas à l'application GestPR.");
+                return NotFound("Utilisateur non trouvï¿½ ou n'appartient pas ï¿½ l'application GestPR.");
 
             _context.ApplicationUsers.Remove(dbUser);
             await _context.SaveChangesAsync();
@@ -357,7 +357,7 @@ namespace GestPR.Controllers
             catch (Exception ex)
             {
                 return StatusCode(StatusCodes.Status500InternalServerError,
-                    $"Erreur lors de la récupération du compte utilisateur : {ex.Message}");
+                    $"Erreur lors de la rï¿½cupï¿½ration du compte utilisateur : {ex.Message}");
             }
         }
 
@@ -382,10 +382,86 @@ namespace GestPR.Controllers
             // Renvoie exactement l'Id attendu par ton demandeur.jsx !
             return Ok(new { Id = user.Id, Username = user.AdUsername });
         }
+
+
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] LoginPasswordRequest model)
+        {
+            var matricule = model.Matricule?.Trim() ?? "";
+            if (matricule.Length == 0 || string.IsNullOrEmpty(model.Pass))
+                return BadRequest(new { message = "Matricule et mot de passe obligatoires." });
+
+            var user = await _context.ApplicationUsers
+                .FirstOrDefaultAsync(u => u.AdUsername.ToLower() == matricule.ToLower()
+                                       && u.ApplicationName == "GestPR");
+
+            var cred = user == null ? null
+                : await _context.UtilisateurCredentials.FirstOrDefaultAsync(c => c.ApplicationUserId == user.Id);
+
+            // Mï¿½me message dans tous les cas d'ï¿½chec : on ne rï¿½vï¿½le pas si le matricule existe
+            if (user == null || cred == null || !BCrypt.Net.BCrypt.Verify(model.Pass, cred.PasswordHash))
+                return BadRequest(new { message = "Matricule ou mot de passe incorrect." });
+
+            if (user.IsActive != 1)
+                return StatusCode(403, new { message = "Votre compte est dï¿½sactivï¿½." });
+
+            return Ok(new
+            {
+                Connected = true,
+                Id = user.Id,
+                Username = user.AdUsername,
+                Nom = user.Nom,
+                Prenom = user.Prenom,
+                Mail = user.Mail,
+                Role = user.Role,
+                Site = user.Site
+            });
+        }
+
+        [HttpPost("inscription")]
+        public async Task<IActionResult> Inscription([FromBody] InscriptionRequest model)
+        {
+            var matricule = model.Matricule?.Trim() ?? "";
+            if (matricule.Length == 0)
+                return BadRequest(new { message = "Le matricule est obligatoire." });
+            if (string.IsNullOrEmpty(model.Password) || model.Password.Length < 8)
+                return BadRequest(new { message = "Le mot de passe doit contenir au moins 8 caractï¿½res." });
+
+            var user = await _context.ApplicationUsers
+                .FirstOrDefaultAsync(u => u.AdUsername.ToLower() == matricule.ToLower()
+                                       && u.ApplicationName == "GestPR");
+            if (user == null)
+                return BadRequest(new { message = "Ce matricule n'est pas enregistrï¿½. Contactez votre administrateur." });
+            if (user.IsActive != 1)
+                return BadRequest(new { message = "Votre compte est dï¿½sactivï¿½." });
+
+            if (await _context.UtilisateurCredentials.AnyAsync(c => c.ApplicationUserId == user.Id))
+                return BadRequest(new { message = "Ce compte a dï¿½jï¿½ un mot de passe. Veuillez vous connecter." });
+
+            _context.UtilisateurCredentials.Add(new UtilisateurCredential
+            {
+                ApplicationUserId = user.Id,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.Password, 11)
+            });
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Compte activï¿½. Vous pouvez vous connecter." });
+        }
+
     }
 
 
+    public class LoginPasswordRequest
+    {
+        public string Matricule { get; set; } = string.Empty;
+        public string Pass { get; set; } = string.Empty;
+    }
 
+    public class InscriptionRequest
+    {
+        public string Matricule { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+    }
 
     public class NewUserDto
     {
@@ -403,4 +479,5 @@ namespace GestPR.Controllers
         public string Username { get; set; } = string.Empty;
         public string Password { get; set; } = string.Empty;
     }
+
 }

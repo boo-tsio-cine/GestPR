@@ -147,6 +147,10 @@ export const coursChangeService = {
 
 export const authService = {
   connexionAutomatiqueWindows: () => api.get("/Auth/windows-login"),
+  connexionParMatricule: (matricule) => api.post("/Auth/login", { matricule }),
+  connexion: ({ matricule, pass }) => api.post("/Auth/login", { matricule, pass }),
+  inscription: ({ matricule, password }) => api.post("/Auth/inscription", { matricule, password }),
+
 };
 
 export const demandeService = {

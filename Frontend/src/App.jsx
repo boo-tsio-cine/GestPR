@@ -20,39 +20,66 @@ import Valid from "./components/validateur/valid";
 import TraitementAutomatiqueDocument from "./components/comptabilite/traitement/traitementAutomatiqueDocument";
 import AgentCoordinateur from "./components/validateur/agentCoordinateur";
 import AgentsDecision from "./page/AgentsDecision";
+import Login from "./components/Login";
+import SignupPage from "./components/Signup";
 
 function App() {
   const { user, login} = useAuth();
-  const [loading, setLoading] = useState(!user); 
+  // const [loading, setLoading] = useState(!user); 
   const navigate = useNavigate();
   const hasChecked = useRef(false);
 
+  // "password" (maison / démo) ou "windows" (entreprise, LDAP)
+  const AUTH_MODE = import.meta.env.VITE_AUTH_MODE || "password";
+
+  // useEffect(() => {
+  //   if (hasChecked.current) {
+  //     setLoading(false);
+  //     return;
+  //   }
+
+  //   const tenterSsoWindows = async () => {
+  //     hasChecked.current = true;
+  //     try {
+  //       const response = await authService.connexionAutomatiqueWindows();
+        
+  //       // 🟢 AJOUTEZ CE LOG ICI POUR VOIR LE CONTENU DANS LA CONSOLE (F12) :
+  //       console.log("Réponse brute LDAP reçue par React :", response);
+
+  //       if (response.data) {
+  //         login(response.data); 
+  //       }
+  //     } catch (error) {
+  //       console.error("Échec de la récupération LDAP Windows :", error);
+  //     } finally {
+  //       setLoading(false);
+  //     }
+  //   };
+
+  //   tenterSsoWindows();
+  // }, [ login]);
+
+  // 
+
+  const [loading, setLoading] = useState(AUTH_MODE === "windows" && !user);
+
   useEffect(() => {
-    if (hasChecked.current) {
-      setLoading(false);
-      return;
-    }
+    if (AUTH_MODE !== "windows") return;       // pas de SSO en mode matricule
+    if (hasChecked.current) { setLoading(false); return; }
 
     const tenterSsoWindows = async () => {
       hasChecked.current = true;
       try {
         const response = await authService.connexionAutomatiqueWindows();
-        
-        // 🟢 AJOUTEZ CE LOG ICI POUR VOIR LE CONTENU DANS LA CONSOLE (F12) :
-        console.log("Réponse brute LDAP reçue par React :", response);
-
-        if (response.data) {
-          login(response.data); 
-        }
+        if (response.data) login(response.data);
       } catch (error) {
         console.error("Échec de la récupération LDAP Windows :", error);
       } finally {
         setLoading(false);
       }
     };
-
     tenterSsoWindows();
-  }, [ login]);
+  }, [login]);
 
   if (loading) {
     return (
@@ -69,7 +96,11 @@ function App() {
   return (
     <Routes>
       {/* 🔓 PAGE DE BIENVENUE UNIQUE AU PREMIER CHARGEMENT */}
-      <Route path="/" element={<Welcome />} />
+      {/* <Route path="/" element={<Welcome />} /> */}
+
+      <Route path="/" element={user ? <Welcome /> : <Navigate to="/login" replace />} />
+      <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
+      <Route path="/signup" element={<SignupPage />} />
 
       {/* 🔒 ACCÈS ADMINISTRATION */}
       <Route path="/home@admin" element={<ProtectedRoute roles={["Admin"]}><HomeAdmin /></ProtectedRoute>} />

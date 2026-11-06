@@ -25,6 +25,8 @@ namespace GestPR.Data
         public DbSet<LigneNomenclature> LignesNomenclature { get; set; }
         //public DbSet<ParametreFrais> ParametresFrais { get; set; }
 
+        public DbSet<UtilisateurCredential> UtilisateurCredentials { get; set; }
+
         // ✅ Forcer explicitement la clé primaire
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
